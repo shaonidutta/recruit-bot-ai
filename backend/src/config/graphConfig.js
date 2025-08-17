@@ -1,12 +1,10 @@
-const { z } = require('zod');
-
-// Define the schema for the state object using Zod
-const stateSchema = z.object({
-    keywords: z.string(),
-    linkedinJobs: z.array(z.any()).optional(),
-    indeedJobs: z.array(z.any()).optional(),
-    allJobs: z.array(z.any()).optional(),
-});
+// Simplified state schema for Phase 1 (without zod dependency)
+const stateSchema = {
+    keywords: 'string',
+    linkedinJobs: 'array',
+    indeedJobs: 'array',
+    allJobs: 'array'
+};
 
 const agentConfig = {
     linkedin: {

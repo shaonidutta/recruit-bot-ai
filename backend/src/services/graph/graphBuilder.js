@@ -1,38 +1,51 @@
-const { StateGraph } = require('@langchain/langgraph');
-const { stateSchema, agentConfig } = require('../../config/graphConfig');
-const { startNode, createAgentNode, aggregateNode } = require('./nodes');
+// Temporarily simplified graph builder to avoid langgraph dependency issues
+const { agentConfig } = require('../../config/graphConfig');
 
 function buildGraph() {
-    const sg = new StateGraph(stateSchema);
+    // Simplified graph structure for Phase 1
+    const graph = {
+        agents: {},
+        workflow: ['start', 'agents', 'aggregate']
+    };
 
     // Load agents
-    const agents = Object.entries(agentConfig).reduce((acc, [key, config]) => {
-        acc[key] = require(config.path);
-        return acc;
-    }, {});
+    try {
+        Object.entries(agentConfig).forEach(([key, config]) => {
+            try {
+                graph.agents[key] = require(config.path);
+                console.log('Loaded agent:', key);
+            } catch (err) {
+                console.warn(`Failed to load agent ${key}:`, err.message);
+            }
+        });
+    } catch (err) {
+        console.warn('Error loading agents:', err.message);
+    }
 
-    // Add nodes
-    sg.addNode('start', startNode);
-
-    Object.entries(agents).forEach(([agentName, agentFunc]) => {
-        console.log('Added node for agent:', agentName);
-        sg.addNode(agentName, createAgentNode(agentName, agentFunc));
-    });
-
-    sg.addNode('aggregate', aggregateNode);
-
-    // Set entry point
-    sg.setEntryPoint('start');
-
-    // Add edges
-    Object.keys(agents).forEach(agentName => {
-        sg.addEdge('start', agentName);
-        sg.addEdge(agentName, 'aggregate');
-    });
-
-    // Compile
-    console.log('Compiling graph...');
-    return sg.compile();
+    return graph;
 }
 
-module.exports = { buildGraph };
+function executeGraph(graph, input) {
+    // Simple sequential execution for Phase 1
+    const results = {
+        input,
+        agentResults: {},
+        aggregatedJobs: []
+    };
+
+    // Execute each agent
+    Object.entries(graph.agents).forEach(([agentName, agentFunc]) => {
+        try {
+            if (typeof agentFunc === 'function') {
+                results.agentResults[agentName] = agentFunc(input);
+            }
+        } catch (err) {
+            console.error(`Error executing agent ${agentName}:`, err.message);
+            results.agentResults[agentName] = { error: err.message };
+        }
+    });
+
+    return results;
+}
+
+module.exports = { buildGraph, executeGraph };
