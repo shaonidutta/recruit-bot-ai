@@ -1,14 +1,11 @@
 # services/app/main.py
 
 from fastapi import FastAPI
-from . import routes
+from .routes import router
 
-# This creates your main application instance
-app = FastAPI(title="AI Recruitment Services")
+app = FastAPI(title="AI Recruitment Agent - Task Service")
 
-# This tells your app to use the "menu" you created in routes.py
-app.include_router(routes.router, prefix="/api")
-
+app.include_router(router, prefix="/api", tags=["agents"])
 
 @app.get("/")
 def read_root():
