@@ -3,3 +3,11 @@ uvicorn[standard]
 pydantic
 requests
 python-dotenv
+playwright
+spacy
+tenacity
+httpx
+feedparser
+serpapi
+google-search-results 
+bs4
