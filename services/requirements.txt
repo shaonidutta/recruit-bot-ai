@@ -9,5 +9,16 @@ tenacity
 httpx
 feedparser
 serpapi
-google-search-results 
+google-search-results
 bs4
+openai
+scikit-learn
+numpy
+pandas
+nltk
+textblob
+fuzzywuzzy
+python-levenshtein
+aiohttp
+selenium
+webdriver-manager
