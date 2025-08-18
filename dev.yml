@@ -11,9 +11,8 @@ services:
         volumes:
             - ./backend:/usr/src/app
             - /usr/src/app/node_modules
-        environment:
-            - NODE_ENV=development
-            - SERVICES_URL=http://services:8000
+        env_file:
+            - ./backend/.env
         networks:
             - network
 
@@ -27,9 +26,8 @@ services:
         volumes:
             - ./frontend:/usr/src/app
             - /usr/src/app/node_modules
-        environment:
-            - NODE_ENV=development
-            - BACKEND_URL=http://backend:3000
+        env_file:
+            - ./frontend/.env
         depends_on:
             - backend
         networks:
@@ -44,9 +42,8 @@ services:
             - "8000:8000"
         volumes:
             - ./services:/code
-        environment:
-            - PYTHONUNBUFFERED=1
-            - BACKEND_URL=http://backend:3000
+        env_file:
+            - ./services/.env
         depends_on:
             - backend
         networks:

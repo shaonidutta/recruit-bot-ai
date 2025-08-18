@@ -11,6 +11,14 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
+// Import and use homeRoutes for "/"
+const homeRoutes = require('./routes/homeRoutes');
+const agentRoutes = require('./routes/agentRoutes');
+
+
+app.use('/', homeRoutes);
+app.use('/api', agentRoutes);
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
