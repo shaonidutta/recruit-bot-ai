@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/ui/Button.jsx';
 import { Input } from '../../../components/ui/Input.jsx';
 import { Label } from '../../../components/ui/Label.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { validateEmail, validatePassword, validateName, validateConfirmPassword } from '../../../utils/validators.js';
+import { ROUTES } from '../../../utils/constants.js';
 
 const SignupForm = () => {
   const { register, loading, error, clearError } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -68,7 +71,9 @@ const SignupForm = () => {
         email: formData.email,
         password: formData.password
       });
-      // Navigation will be handled by the auth context and routing
+
+      // Redirect to dashboard after successful signup
+      navigate(ROUTES.DASHBOARD, { replace: true });
     } catch (err) {
       // Error is handled by auth context
       console.error('Signup error:', err);

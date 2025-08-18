@@ -44,15 +44,15 @@ const DashboardHeader = ({ onMenuClick }) => {
           <div className="flex items-center space-x-3">
             <div className="text-right">
               <p className="text-sm font-medium text-slate-900">
-                {user?.name || 'User'}
+                {user?.name}
               </p>
               <p className="text-xs text-slate-500">
-                {user?.email || 'user@example.com'}
+                {user?.email}
               </p>
             </div>
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
               <span className="text-white font-medium text-sm">
-                {(user?.name || 'U').charAt(0).toUpperCase()}
+                {user?.name?.charAt(0)?.toUpperCase() || '?'}
               </span>
             </div>
             <Button

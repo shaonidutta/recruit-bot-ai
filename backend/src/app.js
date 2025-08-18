@@ -33,7 +33,6 @@ app.use(cors({
 app.use('/', routes);
 
 // Global error handler 
-// Global error handler 
 app.use(errorHandler);
 
 module.exports = app;

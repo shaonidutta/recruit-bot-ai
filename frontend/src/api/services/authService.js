@@ -77,6 +77,9 @@ export const authService = {
     try {
       const response = await apiClient.get(ENDPOINTS.AUTH.ME);
       if (response.data.success && response.data.data) {
+        // Update localStorage with fresh user data
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+
         return {
           user: response.data.data.user,
           accessToken: localStorage.getItem('accessToken')
@@ -84,7 +87,24 @@ export const authService = {
       }
       return null;
     } catch (error) {
-      // If token is invalid, clear storage
+      console.error('Auth/me endpoint failed:', error);
+
+      // If auth/me fails but we have valid tokens, try to use localStorage data
+      const accessToken = localStorage.getItem('accessToken');
+      const user = localStorage.getItem('user');
+
+      if (accessToken && user) {
+        try {
+          return {
+            user: JSON.parse(user),
+            accessToken
+          };
+        } catch (parseError) {
+          console.error('Failed to parse user data from localStorage:', parseError);
+        }
+      }
+
+      // If everything fails, clear storage
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');

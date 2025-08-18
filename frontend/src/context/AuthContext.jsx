@@ -12,7 +12,7 @@ const authReducer = (state, action) => {
       return {
         ...state,
         user: action.payload.user,
-        token: action.payload.token,
+        token: action.payload.accessToken || action.payload.token,
         isAuthenticated: true,
         loading: false,
         error: null
@@ -55,8 +55,16 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const data = await authService.login(email, password);
-      dispatch({ type: 'LOGIN_SUCCESS', payload: data });
-      return data;
+
+      // After successful login, fetch fresh user data from auth/me
+      const freshUserData = await authService.verifyToken();
+      if (freshUserData) {
+        dispatch({ type: 'LOGIN_SUCCESS', payload: freshUserData });
+        return freshUserData;
+      } else {
+        dispatch({ type: 'LOGIN_SUCCESS', payload: data });
+        return data;
+      }
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
       throw error;
@@ -68,8 +76,16 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const data = await authService.register(userData);
-      dispatch({ type: 'LOGIN_SUCCESS', payload: data });
-      return data;
+
+      // After successful registration, fetch fresh user data from auth/me
+      const freshUserData = await authService.verifyToken();
+      if (freshUserData) {
+        dispatch({ type: 'LOGIN_SUCCESS', payload: freshUserData });
+        return freshUserData;
+      } else {
+        dispatch({ type: 'LOGIN_SUCCESS', payload: data });
+        return data;
+      }
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
       throw error;
@@ -87,18 +103,36 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'CLEAR_ERROR' });
   }, []);
 
+  // Refresh user data from auth/me endpoint
+  const refreshUserData = useCallback(async () => {
+    try {
+      const userData = await authService.verifyToken();
+      if (userData) {
+        dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+        return userData;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+      dispatch({ type: 'LOGOUT' });
+      return null;
+    }
+  }, []);
+
   // Check for existing token on app load
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         const userData = authService.getCurrentUser();
-        
+
         if (userData) {
-          // Verify token with backend (when ready)
+          // Always verify token with backend and get fresh user data
           const verifiedData = await authService.verifyToken();
           if (verifiedData) {
             dispatch({ type: 'LOGIN_SUCCESS', payload: verifiedData });
           } else {
+            // Token is invalid, clear storage and set loading to false
+            authService.logout();
             dispatch({ type: 'SET_LOADING', payload: false });
           }
         } else {
@@ -106,6 +140,8 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
+        // Clear any invalid tokens
+        authService.logout();
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
@@ -119,8 +155,9 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    clearError
-  }), [state, login, register, logout, clearError]);
+    clearError,
+    refreshUserData
+  }), [state, login, register, logout, clearError, refreshUserData]);
 
   return (
     <AuthContext.Provider value={contextValue}>

@@ -10,6 +10,7 @@ function buildGraph() {
         acc[key] = require(config.path);
         return acc;
     }, {});
+  
 
     // Add nodes
     sg.addNode('start', startNode);
