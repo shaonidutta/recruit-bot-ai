@@ -10,7 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@radix-ui/react-progress": "^1.0.3",
+    "@radix-ui/react-separator": "^1.0.3",
     "axios": "^1.11.0",
+    "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.539.0",
     "react": "^19.1.1",

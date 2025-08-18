@@ -29,6 +29,4 @@ router.get('/api', (_, res) => {
   });
 });
 
-// Handle 404 for unmatched routes (will be handled by Express default)
-
 module.exports = router;

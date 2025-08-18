@@ -41,7 +41,7 @@ const connectDB = async () => {
       console.log('🟡 Mongoose disconnected from MongoDB');
     });
 
-    // Graceful shutdown
+    // shutdown
     process.on('SIGINT', async () => {
       try {
         await mongoose.connection.close();
