@@ -14,9 +14,7 @@ if not SERPAPI_KEY:
 
 
 async def scrape_indeed_jobs(job_title: str) -> List[Dict]:
-    """
-    Fetch Indeed jobs using SerpAPI (Google Jobs Engine).
-    """
+    """Fetch Indeed jobs using SerpAPI (Google Jobs Engine)."""
     print(f"Fetching Indeed jobs for: {job_title}")
 
     params = {
