@@ -40,4 +40,4 @@ async def fetch_indeed_jobs(job_title: str) -> List[Dict]:
             })
 
     print(f"✅ Found {len(jobs)} Indeed jobs.")
-    return jobs_data
+    return jobs
