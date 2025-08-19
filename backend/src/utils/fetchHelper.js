@@ -8,7 +8,7 @@ async function fetchJobs(agentEndpoint, keywords) {
             url,
             { keywords }
         );
-        console.log("🚀 ~ fetchJobs ~ response:", response.data)
+        console.log("🚀 ~ fetchJobs ~ response:", response)
         console.log(`${agentEndpoint} Agent found ${response.data.jobs.length} jobs`);
         return response.data.jobs;
     } catch (error) {

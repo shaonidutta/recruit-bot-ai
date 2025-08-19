@@ -27,7 +27,7 @@ async def discover_indeed_endpoint(request: JobDiscoveryRequest):
     """
     Triggers the Indeed Scraper Agent.
     """
-    jobs = await scrape_indeed_jobs(request.job_title)
+    jobs = await fetch_indeed_jobs(request.job_title)
     return jobs
 
 router.get(

@@ -40,7 +40,7 @@ async def scrape_indeed_jobs(job_title: str) -> List[Dict]:
             })
 
     print(f"✅ Found {len(jobs)} Indeed jobs.")
-    return jobs
+    return jobs_data
 
 
 async def scrape_linkedin_jobs(job_title: str) -> List[Dict]:
