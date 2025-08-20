@@ -6,14 +6,12 @@ services:
         build:
             context: ./backend
             dockerfile: Dockerfile
-        ports:
-            - "3000:3000"
+        # internal only; exposed via nginx
         volumes:
             - ./backend:/usr/src/app
             - /usr/src/app/node_modules
-        environment:
-            - NODE_ENV=development
-            - SERVICES_URL=http://services:8000
+        env_file:
+            - ./backend/.env
         networks:
             - network
 
@@ -22,14 +20,12 @@ services:
         build:
             context: ./frontend
             dockerfile: Dockerfile
-        ports:
-            - "5173:5173"
+        # internal only; exposed via nginx
         volumes:
             - ./frontend:/usr/src/app
             - /usr/src/app/node_modules
-        environment:
-            - NODE_ENV=development
-            - BACKEND_URL=http://backend:3000
+        env_file:
+            - ./frontend/.env
         depends_on:
             - backend
         networks:
@@ -40,17 +36,30 @@ services:
         build:
             context: ./services
             dockerfile: Dockerfile
-        ports:
-            - "8000:8000"
+        # internal only; exposed via nginx
         volumes:
             - ./services:/code
-        environment:
-            - PYTHONUNBUFFERED=1
-            - BACKEND_URL=http://backend:3000
+        env_file:
+            - ./services/.env
         depends_on:
             - backend
         networks:
             - network
+
+    nginx:
+        container_name: nginx
+        image: nginx:latest
+        ports:
+            - "80:80"
+        volumes:
+            - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+        depends_on:
+            - frontend
+            - backend
+            - services
+        networks:
+            - network
+    # default (no profile needed)
 
 networks:
     network:
