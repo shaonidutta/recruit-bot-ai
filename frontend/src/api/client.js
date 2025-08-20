@@ -1,9 +1,12 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+// Use same-origin path "/api" locally (proxied via Nginx) or a full origin on prod.
+const RAW_BASE = import.meta.env.VITE_BACKEND_URL ?? '/api';
+// Normalize: remove trailing slash to avoid double slashes when joining paths
+const API_BASE_URL = String(RAW_BASE).replace(/\/$/, '');
 
 export const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`,
+  baseURL: `${API_BASE_URL}/v1`,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -13,6 +16,7 @@ export const apiClient = axios.create({
 // Request interceptor - Add auth token
 apiClient.interceptors.request.use(
   (config) => {
+    console.log("🚀 ~ API_BASE_URL:", API_BASE_URL)
     const accessToken = localStorage.getItem('accessToken');
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
@@ -35,7 +39,7 @@ apiClient.interceptors.response.use(
         // Try to refresh token
         const refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/api/v1/auth/refresh`, {
+          const response = await axios.post(`${API_BASE_URL}/v1/auth/refresh`, {
             refreshToken
           });
 

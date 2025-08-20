@@ -1,6 +1,6 @@
 const JOB_SOURCES = {
-    INDEED: 'api/agents/indeed',
-    LINKEDIN: 'api/agents/linkedin',
+    INDEED: 'agents/indeed',
+    LINKEDIN: 'agents/linkedin',
 };
 
 module.exports = {
