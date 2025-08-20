@@ -34,14 +34,17 @@ class EnrichmentService:
         try:
             session = await self.get_session()
             url = "https://api.apollo.io/v1/organizations/search"
+            headers = {
+                "X-Api-Key": APOLLO_API_KEY,
+                "Content-Type": "application/json"
+            }
             payload = {
-                "api_key": APOLLO_API_KEY,
                 "q_organization_name": company_name,
                 "page": 1,
                 "per_page": 1
             }
 
-            async with session.post(url, json=payload) as response:
+            async with session.post(url, json=payload, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
                     orgs = data.get("organizations", [])

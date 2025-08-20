@@ -23,12 +23,16 @@ router = APIRouter()
 
 
 @router.post("/discover/indeed")
-async def discover_indeed_jobs(job_title: str):
+async def discover_indeed_jobs(request: Dict[str, Any]):
     """
     Discover jobs from Indeed
     Returns: Raw job data for backend to process and store
     """
     try:
+        job_title = request.get("job_title")
+        if not job_title:
+            raise HTTPException(status_code=400, detail="job_title is required")
+
         jobs = await fetch_indeed_jobs(job_title)
 
         return {
@@ -48,12 +52,16 @@ async def discover_indeed_jobs(job_title: str):
 
 
 @router.post("/discover/linkedin")
-async def discover_linkedin_jobs(job_title: str):
+async def discover_linkedin_jobs(request: Dict[str, Any]):
     """
     Discover jobs from LinkedIn
     Returns: Raw job data for backend to process and store
     """
     try:
+        job_title = request.get("job_title")
+        if not job_title:
+            raise HTTPException(status_code=400, detail="job_title is required")
+
         jobs = await fetch_linkedin_jobs(job_title)
 
         return {
@@ -105,12 +113,16 @@ async def enrich_job_data(job_data: Dict[str, Any]):
 
 
 @router.post("/enrich/company")
-async def enrich_company_data(company_name: str):
+async def enrich_company_data(request: Dict[str, Any]):
     """
     Enrich company information and find hiring contacts
     Returns: Company and contact data for backend to store
     """
     try:
+        company_name = request.get("company_name")
+        if not company_name:
+            raise HTTPException(status_code=400, detail="company_name is required")
+
         enrichment_service = await get_enrichment_service()
 
         # Enrich company information
