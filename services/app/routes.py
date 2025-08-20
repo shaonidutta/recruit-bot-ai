@@ -1,67 +1,204 @@
 # services/app/routes.py
+"""
+FastAPI routes for AI Recruitment Agent services
+Provides endpoints for job discovery, enrichment, matching, and workflow orchestration
+"""
 
-from fastapi import APIRouter, status
-from pydantic import BaseModel
-from typing import List, Dict, Any
+from fastapi import APIRouter, HTTPException
+from typing import Dict, Any, List
+import logging
 
 from .agents.indeed_agent import fetch_indeed_jobs
 from .agents.linkedin_agent import fetch_linkedin_jobs
-from .agents.google_agent import fetch_google_jobs
+from .enrichment_service import get_enrichment_service
+from .matching_service import get_matching_engine
+from .parsing_service import parse_job_description
 
-# Import your "chef" functions from the service files
-from .scraping_service import scrape_indeed_jobs
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# This is the router, like a menu board
+# Create router
 router = APIRouter()
 
-# --- Pydantic Models (Defines the structure of your API requests) ---
 
-
-class JobDiscoveryRequest(BaseModel):
-    job_title: str
-
-
-# --- API Endpoints (The items on your menu) ---
-
-@router.post("/discover/indeed", response_model=List[Dict])
-async def discover_indeed_endpoint(request: JobDiscoveryRequest):
+@router.post("/discover/indeed")
+async def discover_indeed_jobs(job_title: str):
     """
-    Triggers the Indeed Scraper Agent.
+    Discover jobs from Indeed
+    Returns: Raw job data for backend to process and store
     """
-    jobs = await fetch_indeed_jobs(request.job_title)
-    return jobs
+    try:
+        jobs = await fetch_indeed_jobs(job_title)
+
+        return {
+            "success": True,
+            "message": f"Discovered {len(jobs)} Indeed jobs",
+            "data": {
+                "platform": "indeed",
+                "job_title": job_title,
+                "jobs_found": len(jobs),
+                "jobs": jobs
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Indeed discovery failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/discover/linkedin", response_model=List[Dict])
-async def discover_linkedin_endpoint(request: JobDiscoveryRequest):
+@router.post("/discover/linkedin")
+async def discover_linkedin_jobs(job_title: str):
     """
-    Triggers the LinkedIn Scraper Agent.
+    Discover jobs from LinkedIn
+    Returns: Raw job data for backend to process and store
     """
-    jobs = await fetch_linkedin_jobs(request.job_title)
-    return jobs
+    try:
+        jobs = await fetch_linkedin_jobs(job_title)
+
+        return {
+            "success": True,
+            "message": f"Discovered {len(jobs)} LinkedIn jobs",
+            "data": {
+                "platform": "linkedin",
+                "job_title": job_title,
+                "jobs_found": len(jobs),
+                "jobs": jobs
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"❌ LinkedIn discovery failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/discover/google", response_model=List[Dict])
-async def discover_google_endpoint(request: JobDiscoveryRequest):
+# --- Enrichment Endpoints ---
+
+@router.post("/enrich/job")
+async def enrich_job_data(job_data: Dict[str, Any]):
     """
-    Triggers the Google Scraper Agent.
+    Enrich job data with company information
+    Returns: Enriched data for backend to store
     """
-    jobs = await fetch_google_jobs(request.job_title)
-    return jobs
+    try:
+        enrichment_service = await get_enrichment_service()
+        company_name = job_data.get("company_name") or job_data.get("company")
+
+        if not company_name:
+            return {"success": False, "message": "No company name provided"}
+
+        # Enrich company information
+        company_data = await enrichment_service.enrich_company(company_name)
+
+        return {
+            "success": True,
+            "message": f"Job enrichment completed for {company_name}",
+            "data": {
+                "job_data": job_data,
+                "company_data": company_data
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Job enrichment failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/enrich/company")
+async def enrich_company_data(company_name: str):
+    """
+    Enrich company information and find hiring contacts
+    Returns: Company and contact data for backend to store
+    """
+    try:
+        enrichment_service = await get_enrichment_service()
 
-router.get(
-    "/agents/linkedin",
-    status_code=status.HTTP_200_OK
-)(fetch_linkedin_jobs)
+        # Enrich company information
+        company_data = await enrichment_service.enrich_company(company_name)
 
-router.get(
-    "/agents/indeed",
-    status_code=status.HTTP_200_OK
-)(fetch_indeed_jobs)
+        return {
+            "success": True,
+            "message": f"Company enrichment completed for {company_name}",
+            "data": {
+                "company_data": company_data
+            }
+        }
 
-router.get(
-    "/agents/google",
-    status_code=status.HTTP_200_OK
-)(fetch_google_jobs)
+    except Exception as e:
+        logger.error(f"❌ Company enrichment failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Matching Endpoints ---
+
+@router.post("/match/candidates")
+async def match_candidates_to_job(job_data: Dict[str, Any], candidates: List[Dict[str, Any]], min_score: float = 0.75):
+    """
+    Find candidate matches for a job
+    Returns: Match data for backend to store
+    """
+    try:
+        matching_engine = get_matching_engine()
+        result = matching_engine.match_candidates_to_job(job_data, candidates, min_score)
+        return result
+
+    except Exception as e:
+        logger.error(f"❌ Matching failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Processing Endpoints ---
+
+@router.post("/parse/job")
+async def parse_job_description_endpoint(request: Dict[str, Any]):
+    """
+    Parse job description to extract skills, requirements, etc.
+    Returns: Parsed job data for backend to store
+    """
+    try:
+        description = request.get("description", "")
+        job_title = request.get("job_title", "")
+        parsed_data = parse_job_description(description, job_title)
+
+        return {
+            "success": True,
+            "message": "Job description parsed successfully",
+            "data": parsed_data
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Job parsing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Health Check ---
+
+@router.get("/health")
+async def health_check():
+    """
+    Health check endpoint
+    """
+    return {
+        "success": True,
+        "message": "AI Recruitment Services are running",
+        "services": {
+            "discovery": "✅ Available",
+            "enrichment": "✅ Available",
+            "parsing": "✅ Available",
+            "matching": "✅ Available"
+        }
+    }
+
+
+# --- Legacy Agent Endpoints (for backward compatibility) ---
+
+@router.get("/agents/linkedin")
+async def linkedin_agent_legacy(job_title: str = "Software Engineer"):
+    """Legacy endpoint for LinkedIn agent"""
+    return await fetch_linkedin_jobs(job_title)
+
+
+@router.get("/agents/indeed")
+async def indeed_agent_legacy(job_title: str = "Software Engineer"):
+    """Legacy endpoint for Indeed agent"""
+    return await fetch_indeed_jobs(job_title)

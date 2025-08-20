@@ -1,105 +1,157 @@
 # services/app/services.py
+"""
+Orchestration layer for AI Recruitment Agent workflows
+Combines discovery, enrichment, parsing, and matching services
+"""
 
-from typing import List, Dict, Any
-from .scraping_service import scrape_indeed_jobs
+import time
+from typing import Dict, Any, Optional
+from datetime import datetime, timezone
+import logging
+
+# Database operations handled by backend - removed database import
+from .enrichment_service import get_enrichment_service
 from .parsing_service import parse_job_description
-from .enrichment_service import enrich_job, enrich_company, find_hiring_contacts
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-async def complete_job_discovery_workflow(job_title: str, location: str = None) -> List[Dict[str, Any]]:
+async def store_discovered_job(job_data: Dict[str, Any], platform: str) -> Optional[Dict[str, Any]]:
     """
-    Complete workflow: Scrape jobs from Indeed, parse descriptions, and enrich with company data.
-    
-    Args:
-        job_title: The job title to search for
-        location: Optional location filter
-    
-    Returns:
-        List of enriched job postings with company info and contacts
+    Process discovered job data for backend storage
+    Why this function? Validates and structures job data before backend storage
     """
-    # Step 1: Scrape jobs from Indeed
-    raw_jobs = await scrape_indeed_jobs(job_title)
-    
-    enriched_jobs = []
-    
-    for job in raw_jobs:
-        try:
-            # Step 2: Parse job description if available
-            if job.get('description'):
-                parsed_data = parse_job_description(job['description'])
-                job.update(parsed_data)
-            
-            # Step 3: Enrich with company information and contacts
-            enriched_job = enrich_job(job)
-            enriched_jobs.append(enriched_job)
-            
-        except Exception as e:
-            # If enrichment fails, still include the basic job data
-            print(f"Error enriching job {job.get('title', 'Unknown')}: {str(e)}")
-            enriched_jobs.append(job)
-    
-    return enriched_jobs
+    try:
+        # Structure job data according to our model
+        structured_job = {
+            "title": job_data.get("title", ""),
+            "company_name": job_data.get("company_name") or job_data.get("company", ""),
+            "location": job_data.get("location"),
+            "description": job_data.get("description"),
+            "source": {
+                "platform": platform,
+                "agent_run_id": f"run_{int(time.time())}",
+                "url": job_data.get("link") or job_data.get("url")
+            },
+            "status": "discovered",
+            "raw_data": job_data,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        logger.info(f"✅ Job processed: {structured_job['title']} at {structured_job['company_name']}")
+
+        # Return structured data for backend to store
+        return structured_job
+
+    except Exception as e:
+        logger.error(f"❌ Failed to process job: {e}")
+        return None
 
 
-async def analyze_company_hiring_pipeline(company_name: str) -> Dict[str, Any]:
+async def process_job_pipeline(job_id: str) -> Dict[str, Any]:
     """
-    Comprehensive company analysis including company info and hiring contacts.
-    
-    Args:
-        company_name: Name of the company to analyze
-    
-    Returns:
-        Dictionary with company information and hiring contacts
+    Complete job processing pipeline: enrichment → parsing → matching
+    Why this workflow? Sequential processing ensures data consistency and proper status tracking
     """
-    # Get company information
-    company_info = enrich_company(company_name)
-    
-    # Get hiring contacts (recruiters, HR, talent acquisition)
-    hiring_contacts = []
-    contact_roles = ["Recruiter", "Talent Acquisition", "HR Manager", "Human Resources"]
-    
-    for role in contact_roles:
-        contacts = find_hiring_contacts(company_name, role)
-        for contact in contacts:
-            contact['search_role'] = role
-            hiring_contacts.append(contact)
-    
-    return {
-        "company_info": company_info,
-        "hiring_contacts": hiring_contacts,
-        "total_contacts_found": len(hiring_contacts)
-    }
+    start_time = time.time()
+
+    try:
+        logger.info(f"🚀 Starting job pipeline for job: {job_id}")
+
+        # This function now returns processing instructions for backend
+        # Backend will handle database operations and orchestration
+        return {
+            "success": True,
+            "message": "Pipeline processing moved to backend",
+            "instructions": {
+                "steps": [
+                    "1. Enrich company data using enrichment service",
+                    "2. Parse job description using parsing service",
+                    "3. Find candidate matches using matching service"
+                ],
+                "note": "Database operations handled by backend"
+            },
+            "processing_time": time.time() - start_time
+        }
 
 
-async def job_application_prep(job_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    except Exception as e:
+        logger.error(f"❌ Job pipeline failed for {job_id}: {e}")
+        return {
+            "success": False,
+            "message": f"Pipeline failed: {str(e)}",
+            "data": None,
+            "processing_time": time.time() - start_time
+        }
+
+
+async def enrich_company_standalone(company_name: str) -> Dict[str, Any]:
     """
-    Prepare comprehensive data for job application including company research and contacts.
-    
-    Args:
-        job_data: Basic job information (title, company, description, etc.)
-    
-    Returns:
-        Complete application preparation data
+    Standalone company enrichment for direct API calls
+    Why separate function? Allows direct company enrichment without job context
     """
-    company_name = job_data.get('company_name') or job_data.get('company')
-    
-    if not company_name:
-        return {"error": "Company name not found in job data"}
-    
-    # Parse job description if available
-    parsed_job = job_data.copy()
-    if job_data.get('description'):
-        parsed_data = parse_job_description(job_data['description'])
-        parsed_job.update(parsed_data)
-    
-    # Get company analysis
-    company_analysis = await analyze_company_hiring_pipeline(company_name)
-    
-    # Enrich the job with all available data
-    enriched_job = enrich_job(parsed_job)
-    
-    return {
-        "job_details": enriched_job,
-        "company_analysis": company_analysis,
-        "application_ready": True
-    }
+    try:
+        enrichment_service = await get_enrichment_service()
+
+        # Enrich company information
+        company_data = await enrichment_service.enrich_company(company_name)
+
+        if not company_data:
+            return {
+                "success": False,
+                "message": f"No company data found for: {company_name}",
+                "data": None
+            }
+
+        return {
+            "success": True,
+            "message": f"Company enrichment completed for {company_name}",
+            "data": {
+                "company_data": company_data
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Company enrichment failed for {company_name}: {e}")
+        return {
+            "success": False,
+            "message": f"Enrichment failed: {str(e)}",
+            "data": None
+        }
+
+
+# Batch processing and job matching moved to backend - database operations handled there
+
+
+# Simple utility functions for data processing
+async def parse_job_data(job_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Parse job description and extract structured data
+    """
+    try:
+        description = job_data.get("description", "")
+        title = job_data.get("title", "")
+
+        if description:
+            parsed_data = parse_job_description(description, title)
+            return {
+                "success": True,
+                "parsed_data": parsed_data
+            }
+
+        return {
+            "success": False,
+            "message": "No description to parse"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Job parsing failed: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
