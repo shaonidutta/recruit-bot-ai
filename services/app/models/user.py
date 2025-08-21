@@ -77,7 +77,7 @@ class UserService:
     def get_collection():
         """Get users collection"""
         db = get_database()
-        return db[COLLECTIONS["USERS"]]
+        return db[COLLECTIONS["users"]]
     
     @classmethod
     async def create_user(cls, user_data: UserCreate) -> UserInDB:

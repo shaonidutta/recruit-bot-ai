@@ -53,7 +53,7 @@ class MatchService:
     def get_collection():
         """Get matches collection"""
         db = get_database()
-        return db[COLLECTIONS.get("MATCHES", "matches")]
+        return db[COLLECTIONS.get("matches", "matches")]
     
     @classmethod
     async def create_match(cls, match_data: Dict[str, Any]) -> MatchInDB:

@@ -107,7 +107,7 @@ class CandidateService:
     def get_collection():
         """Get candidates collection"""
         db = get_database()
-        return db[COLLECTIONS.get("CANDIDATES", "candidates")]
+        return db[COLLECTIONS.get("candidates", "candidates")]
     
     @classmethod
     async def create_candidate(cls, candidate_data: CandidateCreate) -> CandidateInDB:
