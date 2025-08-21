@@ -330,6 +330,23 @@ class ContactService:
         except Exception as e:
             logger.error(f"❌ Failed to search contacts: {e}")
             return []
+    
+    async def get_all_contacts(self, limit: int = 50, skip: int = 0) -> List[ContactResponse]:
+        """Fetch all contacts (simple pagination)"""
+        try:
+            collection = await self._get_collection()
+            cursor = collection.find({}).sort("created_at", -1).skip(skip).limit(limit)
+            results: List[ContactResponse] = []
+            async for doc in cursor:
+                results.append(ContactResponse(
+                    id=str(doc["_id"]),
+                    company_id=str(doc["company_id"]),
+                    **{k: v for k, v in doc.items() if k not in ["_id", "company_id"]}
+                ))
+            return results
+        except Exception as e:
+            logger.error(f"❌ Failed to get_all_contacts: {e}")
+            return []
 
 
 # Global service instance
