@@ -5,10 +5,9 @@ Replaces both agent_orchestrator.py and base_workflow.py
 """
 import logging
 from typing import Dict, List, Any, TypedDict, Annotated
-from datetime import datetime
+from datetime import datetime, timezone
 from langgraph.graph import StateGraph, END
 from operator import add
-import operator
 
 # Custom reducer for keywords (last value wins)
 def keywords_reducer(x: str, y: str) -> str:
@@ -51,6 +50,7 @@ class UnifiedRecruitmentState(TypedDict):
     stored_jobs: List[Dict[str, Any]]
 
     # Workflow metadata
+    workflow_id: str
     current_step: str
     started_at: str
     completed_at: str
@@ -255,6 +255,10 @@ class UnifiedOrchestrator:
     async def run_complete_workflow(self, keywords: str = "Software Engineer") -> Dict[str, Any]:
         """Run the complete recruitment workflow"""
         try:
+            # Track start time and generate workflow ID
+            start_time = datetime.now(timezone.utc)
+            workflow_id = f"unified_{start_time.strftime('%Y%m%d_%H%M%S')}"
+
             # Initialize state
             initial_state: UnifiedRecruitmentState = {
                 "keywords": keywords or DEFAULT_KEYWORDS,
@@ -268,8 +272,9 @@ class UnifiedOrchestrator:
                 "quality_checked_jobs": [],
                 "matched_jobs": [],
                 "stored_jobs": [],
+                "workflow_id": workflow_id,
                 "current_step": "starting",
-                "started_at": datetime.utcnow().isoformat(),
+                "started_at": start_time.isoformat(),
                 "completed_at": "",
                 "errors": [],
                 "stats": {},
@@ -281,14 +286,23 @@ class UnifiedOrchestrator:
                     "min_match_score": 0.7
                 }
             }
-            
+
             logger.info(f"🚀 Starting unified workflow with keywords: '{initial_state['keywords']}'")
-            
+
             # Run the complete graph
             final_state = await self.graph.ainvoke(initial_state)
-            
+
+            # Calculate processing time
+            end_time = datetime.now(timezone.utc)
+            processing_time_seconds = (end_time - start_time).total_seconds()
+
             # Mark completion
-            final_state["completed_at"] = datetime.utcnow().isoformat()
+            final_state["completed_at"] = end_time.isoformat()
+
+            # Update stats with processing time
+            if "stats" not in final_state:
+                final_state["stats"] = {}
+            final_state["stats"]["processing_time_seconds"] = round(processing_time_seconds, 2)
             
             # Log final results
             stats = final_state.get("stats", {})
@@ -300,7 +314,7 @@ class UnifiedOrchestrator:
             
             return {
                 "success": True,
-                "workflow_id": f"unified_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+                "workflow_id": final_state.get('workflow_id', workflow_id),
                 "stats": stats,
                 "jobs_discovered": stats.get('total_jobs_discovered', 0),
                 "jobs_stored": len(final_state.get('stored_jobs', [])),
@@ -314,7 +328,7 @@ class UnifiedOrchestrator:
             return {
                 "success": False,
                 "error": str(e),
-                "workflow_id": f"failed_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+                "workflow_id": f"failed_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
             }
 
 # Global instance

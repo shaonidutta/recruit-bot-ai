@@ -81,3 +81,7 @@ async def api_info():
         },
         "timestamp": "2025-01-20T00:00:00Z"
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

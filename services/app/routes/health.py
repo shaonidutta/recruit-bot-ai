@@ -4,7 +4,7 @@ Converted from backend/src/routes/healthRoutes.js
 System health and database connectivity checks
 """
 from fastapi import APIRouter, HTTPException
-from datetime import datetime
+from datetime import datetime, timezone
 from ..config.database import get_connection_status, is_connected
 from ..utils.response_helper import send_success, send_error
 
@@ -20,14 +20,14 @@ async def health_check():
         return send_success(
             data={
                 "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                 "service": "AI Recruitment Agent API",
                 "version": "1.0.0"
             },
             message="Service is healthy"
         )
     except Exception as e:
-        send_error("Health check failed", 500)
+        return send_error("Health check failed", 500)
 
 @router.get("/db")
 async def database_health():
@@ -50,10 +50,10 @@ async def database_health():
                 message="Database is connected"
             )
         else:
-            send_error("Database is not connected", 503)
-            
+            return send_error("Database is not connected", 503)
+
     except Exception as e:
-        send_error("Database health check failed", 500)
+        return send_error("Database health check failed", 500)
 
 @router.get("/detailed")
 async def detailed_health():
@@ -62,7 +62,7 @@ async def detailed_health():
     GET /health/detailed
     """
     try:
-        db_status = get_connection_status()
+        db_status = await get_connection_status()
         
         health_data = {
             "service": {
@@ -76,7 +76,7 @@ async def detailed_health():
                 "status": db_status,
                 "connected": is_connected()
             },
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
         }
         
         # Overall status
@@ -87,6 +87,6 @@ async def detailed_health():
             data=health_data,
             message=f"System status: {overall_status}"
         )
-        
+
     except Exception as e:
-        send_error("Detailed health check failed", 500)
+        return send_error("Detailed health check failed", 500)
