@@ -29,7 +29,7 @@ async def storage_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
     for job in jobs_to_store:
         try:
-            # Store job to database with company relationship
+            # Store job to database with company relationship and workflow tracking
             job_data = JobCreate(
                 title=job.get("title"),
                 company=job.get("company"),
@@ -42,7 +42,8 @@ async def storage_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 via=job.get("source", "unknown"),
                 company_id=job.get("company_id"),  # NEW: Link to company
                 company_data=job.get("company_data"),  # Keep for backward compatibility
-                parsed_data=job.get("parsed_data")
+                parsed_data=job.get("parsed_data"),
+                workflow_id=state.get("workflow_id")  # NEW: Track which workflow discovered this job
             )
             stored_job = await job_service.create_job(job_data)
 

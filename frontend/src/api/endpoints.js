@@ -1,29 +1,11 @@
 export const ENDPOINTS = {
   // Authentication
   AUTH: {
-    LOGIN: '/auth/login',
-    REGISTER: '/auth/register',
-    ME: '/auth/profile',
-    LOGOUT: '/auth/logout',
-    REFRESH: '/auth/refresh',
-  },
-
-  // Jobs
-  JOBS: {
-    LIST: '/jobs',
-    GET: (id) => `/jobs/${id}`,
-    CREATE: '/jobs',
-    UPDATE: (id) => `/jobs/${id}`,
-    DELETE: (id) => `/jobs/${id}`,
-  },
-
-  // Candidates
-  CANDIDATES: {
-    LIST: '/candidates',
-    GET: (id) => `/candidates/${id}`,
-    CREATE: '/candidates',
-    UPDATE: (id) => `/candidates/${id}`,
-    DELETE: (id) => `/candidates/${id}`,
+    LOGIN: '/api/v1/auth/login',
+    REGISTER: '/api/v1/auth/register',
+    ME: '/api/v1/auth/profile',
+    LOGOUT: '/api/v1/auth/logout',
+    REFRESH: '/api/v1/auth/refresh',
   },
 
 };

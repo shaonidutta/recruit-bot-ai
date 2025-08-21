@@ -56,7 +56,8 @@ async def login(login_data: LoginRequest):
     except HTTPException:
         raise
     except Exception as e:
-        send_error("Login failed", 500)
+        logger.error(f"Login failed: {str(e)}", exc_info=True)
+        return send_error(f"Login failed: {str(e)}", 500)
 
 @router.post("/refresh")
 async def refresh_token(refresh_data: RefreshTokenRequest):
@@ -65,7 +66,9 @@ async def refresh_token(refresh_data: RefreshTokenRequest):
     POST /api/v1/auth/refresh
     """
     try:
+        logger.info("Attempting to refresh token")
         result = await AuthService.refresh_tokens(refresh_data.refreshToken)
+        logger.info("Token refreshed successfully")
         return send_success(
             data=result,
             message="Token refreshed successfully"
@@ -73,7 +76,8 @@ async def refresh_token(refresh_data: RefreshTokenRequest):
     except HTTPException:
         raise
     except Exception as e:
-        send_error("Token refresh failed", 500)
+        logger.error(f"Token refresh failed: {str(e)}", exc_info=True)
+        return send_error(f"Token refresh failed: {str(e)}", 500)
 
 @router.get("/profile")
 async def get_profile(current_user: UserInDB = Depends(get_current_user)):
@@ -82,7 +86,9 @@ async def get_profile(current_user: UserInDB = Depends(get_current_user)):
     GET /api/v1/auth/profile
     """
     try:
+        logger.info(f"Getting profile for user: {current_user.email}")
         result = await AuthService.get_user_profile(str(current_user.id))
+        logger.info(f"Profile retrieved successfully for user: {current_user.email}")
         return send_success(
             data=result,
             message="Profile retrieved successfully"
@@ -90,7 +96,8 @@ async def get_profile(current_user: UserInDB = Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        send_error("Failed to get profile", 500)
+        logger.error(f"Failed to get profile for user {current_user.email}: {str(e)}", exc_info=True)
+        return send_error(f"Failed to get profile: {str(e)}", 500)
 
 @router.post("/logout")
 async def logout(current_user: UserInDB = Depends(get_current_user)):

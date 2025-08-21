@@ -1,90 +1,79 @@
 import { apiClient } from '../client.js';
 import { ENDPOINTS } from '../endpoints.js';
+import { handleApiError } from '../errorHandler.js';
 
 export const jobsService = {
-  /**
-   * Get all jobs with optional pagination and filtering
-   * @param {Object} params - Query parameters
-   * @param {number} params.page - Page number (optional)
-   * @param {number} params.limit - Items per page (optional)
-   * @param {string} params.search - Search query (optional)
-   * @param {string} params.location - Location filter (optional)
-   * @param {string} params.company - Company filter (optional)
-   * @param {string} params.jobType - Job type filter (optional)
-   * @returns {Promise} API response
-   */
-  async getAllJobs(params = {}) {
+  // Get job statistics
+  getStats: async () => {
     try {
-      const response = await apiClient.get(ENDPOINTS.JOBS.LIST, {
-        params
-      });
+      const response = await apiClient.get(ENDPOINTS.JOBS.STATS);
       return response.data;
     } catch (error) {
-      console.error('Error fetching jobs:', error);
-      throw error;
+      throw handleApiError(error);
     }
   },
 
-  /**
-   * Get a single job by ID
-   * @param {string} id - Job ID
-   * @returns {Promise} API response
-   */
-  async getJobById(id) {
+  // Get jobs list with pagination and search
+  getJobs: async (params = {}) => {
     try {
-      const response = await apiClient.get(ENDPOINTS.JOBS.GET(id));
+      const response = await apiClient.get(ENDPOINTS.JOBS.LIST, { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching job:', error);
-      throw error;
+      throw handleApiError(error);
     }
   },
 
-  /**
-   * Create a new job
-   * @param {Object} jobData - Job data
-   * @returns {Promise} API response
-   */
-  async createJob(jobData) {
+  // Get job by ID
+  getJobById: async (jobId) => {
+    try {
+      const response = await apiClient.get(ENDPOINTS.JOBS.BY_ID(jobId));
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  // Create new job
+  createJob: async (jobData) => {
     try {
       const response = await apiClient.post(ENDPOINTS.JOBS.CREATE, jobData);
       return response.data;
     } catch (error) {
-      console.error('Error creating job:', error);
-      throw error;
+      throw handleApiError(error);
     }
   },
 
-  /**
-   * Update an existing job
-   * @param {string} id - Job ID
-   * @param {Object} jobData - Updated job data
-   * @returns {Promise} API response
-   */
-  async updateJob(id, jobData) {
+  // Update job
+  updateJob: async (jobId, jobData) => {
     try {
-      const response = await apiClient.put(ENDPOINTS.JOBS.UPDATE(id), jobData);
+      const response = await apiClient.put(ENDPOINTS.JOBS.UPDATE(jobId), jobData);
       return response.data;
     } catch (error) {
-      console.error('Error updating job:', error);
-      throw error;
+      throw handleApiError(error);
     }
   },
 
-  /**
-   * Delete a job
-   * @param {string} id - Job ID
-   * @returns {Promise} API response
-   */
-  async deleteJob(id) {
+  // Search jobs with filters
+  searchJobs: async (searchTerm, filters = {}) => {
     try {
-      const response = await apiClient.delete(ENDPOINTS.JOBS.DELETE(id));
+      const params = {
+        search: searchTerm,
+        ...filters
+      };
+      const response = await apiClient.get(ENDPOINTS.JOBS.LIST, { params });
       return response.data;
     } catch (error) {
-      console.error('Error deleting job:', error);
-      throw error;
+      throw handleApiError(error);
+    }
+  },
+
+  // Get recent jobs from latest workflow run
+  getRecentJobs: async (params = {}) => {
+    try {
+      const response = await apiClient.get(ENDPOINTS.JOBS.RECENT, { params });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
     }
   }
 };
-
-export default jobsService;

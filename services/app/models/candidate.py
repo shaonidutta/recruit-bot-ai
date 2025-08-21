@@ -245,7 +245,18 @@ class CandidateService:
             candidates.append(CandidateInDB(**candidate_doc))
         
         return candidates
-    
+
+    @classmethod
+    async def count_candidates(cls, active_only: bool = True) -> int:
+        """Count total candidates"""
+        collection = cls.get_collection()
+
+        filter_query = {}
+        if active_only:
+            filter_query["is_active"] = True
+
+        return await collection.count_documents(filter_query)
+
     @classmethod
     def to_response(cls, candidate: CandidateInDB) -> CandidateResponse:
         """Convert CandidateInDB to CandidateResponse"""

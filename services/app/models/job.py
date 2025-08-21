@@ -51,6 +51,7 @@ class JobBase(BaseModel):
     via: Optional[str] = None            # Source platform (from scraping)
     raw_data: Optional[dict] = None      # Original scraped data
     processing_status: Optional[str] = "discovered"  # discovered, enriched, parsed, matched
+    workflow_id: Optional[str] = None    # ID of the workflow run that discovered this job
 
 class JobCreate(JobBase):
     pass
@@ -77,6 +78,7 @@ class JobUpdate(BaseModel):
     via: Optional[str] = None
     raw_data: Optional[dict] = None
     processing_status: Optional[str] = None
+    workflow_id: Optional[str] = None
 
 class JobInDB(JobBase):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
@@ -169,6 +171,10 @@ class JobService:
             job_doc = await collection.find_one({"_id": object_id})
             
             if job_doc:
+                # Convert ObjectId fields to strings for Pydantic validation
+                if job_doc.get('company_id') and isinstance(job_doc['company_id'], ObjectId):
+                    job_doc['company_id'] = str(job_doc['company_id'])
+
                 return JobInDB(**job_doc)
         except Exception:
             pass
@@ -182,6 +188,10 @@ class JobService:
         job_doc = await collection.find_one({"url": url})
         
         if job_doc:
+            # Convert ObjectId fields to strings for Pydantic validation
+            if job_doc.get('company_id') and isinstance(job_doc['company_id'], ObjectId):
+                job_doc['company_id'] = str(job_doc['company_id'])
+
             return JobInDB(**job_doc)
         return None
     
@@ -195,8 +205,12 @@ class JobService:
         
         jobs = []
         async for job_doc in cursor:
+            # Convert ObjectId fields to strings for Pydantic validation
+            if job_doc.get('company_id') and isinstance(job_doc['company_id'], ObjectId):
+                job_doc['company_id'] = str(job_doc['company_id'])
+
             jobs.append(JobInDB(**job_doc))
-        
+
         return jobs
     
     @classmethod
@@ -228,7 +242,41 @@ class JobService:
         collection = cls.get_collection()
         query = {"is_active": True} if active_only else {}
         return await collection.count_documents(query)
-    
+
+    @classmethod
+    async def find_by_workflow_id(cls, workflow_id: str, skip: int = 0, limit: int = 100) -> List[JobInDB]:
+        """Find jobs by workflow_id (recent jobs from specific workflow run)"""
+        collection = cls.get_collection()
+
+        query = {"workflow_id": workflow_id, "is_active": True}
+        cursor = collection.find(query).sort("created_at", -1).skip(skip).limit(limit)
+
+        jobs = []
+        async for job_doc in cursor:
+            # Convert ObjectId fields to strings for Pydantic validation
+            if job_doc.get('company_id') and isinstance(job_doc['company_id'], ObjectId):
+                job_doc['company_id'] = str(job_doc['company_id'])
+
+            jobs.append(JobInDB(**job_doc))
+
+        return jobs
+
+    @classmethod
+    async def get_latest_workflow_id(cls) -> Optional[str]:
+        """Get the most recent workflow_id"""
+        collection = cls.get_collection()
+
+        # Find the most recent job with a workflow_id
+        cursor = collection.find(
+            {"workflow_id": {"$ne": None}},
+            {"workflow_id": 1}
+        ).sort("created_at", -1).limit(1)
+
+        async for doc in cursor:
+            return doc.get("workflow_id")
+
+        return None
+
     @classmethod
     async def search_jobs(cls, query: str, skip: int = 0, limit: int = 100) -> List[JobInDB]:
         """Search jobs by title, company, or description"""
@@ -251,8 +299,12 @@ class JobService:
         
         jobs = []
         async for job_doc in cursor:
+            # Convert ObjectId fields to strings for Pydantic validation
+            if job_doc.get('company_id') and isinstance(job_doc['company_id'], ObjectId):
+                job_doc['company_id'] = str(job_doc['company_id'])
+
             jobs.append(JobInDB(**job_doc))
-        
+
         return jobs
     
     @classmethod
@@ -280,6 +332,7 @@ class JobService:
             via=job.via,
             raw_data=job.raw_data,
             processing_status=job.processing_status,
+            workflow_id=job.workflow_id,
             scraped_at=job.scraped_at,
             created_at=job.created_at,
             updated_at=job.updated_at
