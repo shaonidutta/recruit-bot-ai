@@ -46,6 +46,17 @@ class MatchInDB(MatchBase):
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
+class MatchResponse(MatchBase):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
+
 class MatchService:
     """Match service for database operations"""
     

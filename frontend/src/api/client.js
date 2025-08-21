@@ -44,11 +44,12 @@ apiClient.interceptors.response.use(
           });
 
           if (response.data.success && response.data.data) {
-            localStorage.setItem('accessToken', response.data.data.accessToken);
-            localStorage.setItem('refreshToken', response.data.data.refreshToken);
+            const { tokens } = response.data.data;
+            localStorage.setItem('accessToken', tokens.accessToken);
+            localStorage.setItem('refreshToken', tokens.refreshToken);
 
             // Retry original request with new token
-            originalRequest.headers.Authorization = `Bearer ${response.data.data.accessToken}`;
+            originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
             return apiClient(originalRequest);
           }
         }

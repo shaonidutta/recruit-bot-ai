@@ -29,7 +29,7 @@ async def get_jobs(
         else:
             jobs = await JobService.find_all(skip, limit, active_only)
         
-        job_responses = [JobService.to_response(job) for job in jobs]
+        job_responses = [JobService.to_response(job).dict() for job in jobs]
         total_count = await JobService.count_jobs(active_only)
         
         return send_success(
@@ -62,7 +62,7 @@ async def get_job(
             send_not_found_error("Job not found")
         
         return send_success(
-            data={"job": JobService.to_response(job)},
+            data={"job": JobService.to_response(job).dict()},
             message="Job retrieved successfully"
         )
     except HTTPException:
@@ -82,7 +82,7 @@ async def create_job(
     try:
         job = await JobService.create_job(job_data)
         return send_success(
-            data={"job": JobService.to_response(job)},
+            data={"job": JobService.to_response(job).dict()},
             message="Job created successfully",
             status_code=201
         )
@@ -105,7 +105,7 @@ async def update_job(
             send_not_found_error("Job not found")
         
         return send_success(
-            data={"job": JobService.to_response(job)},
+            data={"job": JobService.to_response(job).dict()},
             message="Job updated successfully"
         )
     except HTTPException:

@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from '../pages/auth/LoginPage.jsx';
 import SignupPage from '../pages/auth/SignupPage.jsx';
 import DashboardPage from '../pages/dashboard/DashboardPage.jsx';
+import JobsPage from '../pages/jobs/JobsPage.jsx';
+import CandidatesPage from '../pages/candidates/CandidatesPage.jsx';
 import ProtectedRoute from './ProtectedRoute.jsx';
 import { ROUTES } from '../utils/constants.js';
 
@@ -19,6 +21,24 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path={ROUTES.JOBS} 
+        element={
+          <ProtectedRoute>
+            <JobsPage />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path={ROUTES.CANDIDATES} 
+        element={
+          <ProtectedRoute>
+            <CandidatesPage />
           </ProtectedRoute>
         } 
       />

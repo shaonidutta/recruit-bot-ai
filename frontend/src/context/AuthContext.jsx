@@ -12,7 +12,7 @@ const authReducer = (state, action) => {
       return {
         ...state,
         user: action.payload.user,
-        token: action.payload.accessToken || action.payload.token,
+        token: action.payload.accessToken || action.payload.tokens?.accessToken || action.payload.token,
         isAuthenticated: true,
         loading: false,
         error: null

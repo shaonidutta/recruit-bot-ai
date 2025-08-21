@@ -9,6 +9,7 @@ from .routes.auth import router as auth_router
 from .routes.health import router as health_router
 from .routes.agents import router as agent_router
 from .routes.jobs import router as jobs_router
+from .routes.candidates import router as candidates_router
 # Scraping now handled by unified orchestrator
 # Individual service routes removed - handled by unified orchestrator
 from .routes.workflows import router as workflows_router
@@ -51,7 +52,8 @@ add_exception_handlers(app)
 app.include_router(health_router, prefix="/health", tags=["health"])
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["authentication"])
 app.include_router(agent_router, prefix="/api", tags=["agents"])
-app.include_router(jobs_router, prefix="/api", tags=["jobs"])
+app.include_router(jobs_router, prefix="/api/v1", tags=["jobs"])
+app.include_router(candidates_router, prefix="/api/v1", tags=["candidates"])
 # Scraping handled by unified orchestrator
 # Individual service routes removed - handled by unified orchestrator
 app.include_router(workflows_router, prefix="/api/v1/workflows", tags=["workflows"])
@@ -73,9 +75,8 @@ async def api_info():
             "health": "/health",
             "auth": "/api/v1/auth",
             "agents": "/api/agents",
-            "jobs": "/api/jobs",
-
-
+            "jobs": "/api/v1/jobs",
+            "candidates": "/api/v1/candidates",
             "workflows": "/api/v1/workflows",
             "documentation": "/docs"
         },

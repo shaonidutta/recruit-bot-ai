@@ -86,6 +86,9 @@ class CandidateResponse(CandidateBase):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
 
 class JobMatch(BaseModel):
     """Model for job-candidate matching results"""
@@ -99,6 +102,11 @@ class JobMatch(BaseModel):
     experience_match: float
     match_details: Optional[dict] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
 
 class CandidateService:
     """Candidate service for database operations"""
