@@ -35,7 +35,7 @@ const CandidatesTable = ({ candidates, loading, onCandidateClick }) => {
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 1) return '1 day ago';
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
@@ -51,6 +51,21 @@ const CandidatesTable = ({ candidates, loading, onCandidateClick }) => {
       'executive': 'bg-red-100 text-red-800'
     };
     return colors[experience?.toLowerCase()] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getExperienceLevel = (candidate) => {
+    // If experience field exists, use it
+    if (candidate.experience) {
+      return candidate.experience;
+    }
+    // Map experience_years to experience levels
+    if (candidate.experience_years !== undefined && candidate.experience_years !== null) {
+      if (candidate.experience_years <= 2) return 'Entry Level';
+      if (candidate.experience_years <= 5) return 'Mid Level';
+      if (candidate.experience_years <= 10) return 'Senior Level';
+      return 'Lead/Principal';
+    }
+    return 'Not specified';
   };
 
   const formatSkills = (skills) => {
@@ -109,10 +124,10 @@ const CandidatesTable = ({ candidates, loading, onCandidateClick }) => {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {candidate.name || candidate.firstName + ' ' + candidate.lastName || 'Unknown Name'}
+                            {candidate.first_name + ' ' + candidate.last_name || 'Unknown Name'}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {candidate.title || candidate.currentPosition || 'No title'}
+                            {candidate.title || candidate.current_role || candidate.currentPosition || 'No title'}
                           </div>
                         </div>
                       </div>
@@ -142,8 +157,8 @@ const CandidatesTable = ({ candidates, loading, onCandidateClick }) => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge className={getExperienceColor(candidate.experience)}>
-                        {candidate.experience || 'Not specified'}
+                      <Badge className={getExperienceColor(getExperienceLevel(candidate))}>
+                        {getExperienceLevel(candidate)}
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
@@ -202,15 +217,15 @@ const CandidatesTable = ({ candidates, loading, onCandidateClick }) => {
                   </div>
                   <div className="ml-3">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {candidate.name || candidate.firstName + ' ' + candidate.lastName || 'Unknown Name'}
+                      {candidate.first_name + ' ' + candidate.last_name || 'Unknown Name'}
                     </h3>
                     <p className="text-sm text-gray-600">
-                      {candidate.title || candidate.currentPosition || 'No title'}
+                      {candidate.title || candidate.current_role || candidate.currentPosition || 'No title'}
                     </p>
                   </div>
                 </div>
-                <Badge className={getExperienceColor(candidate.experience)}>
-                  {candidate.experience || 'Not specified'}
+                <Badge className={getExperienceColor(getExperienceLevel(candidate))}>
+                  {getExperienceLevel(candidate)}
                 </Badge>
               </div>
 
@@ -222,19 +237,19 @@ const CandidatesTable = ({ candidates, loading, onCandidateClick }) => {
                     <span>{candidate.email}</span>
                   </div>
                 )}
-                
+
                 {candidate.phone && (
                   <div className="flex items-center text-sm text-gray-600">
                     <Phone className="h-4 w-4 mr-2" />
                     <span>{candidate.phone}</span>
                   </div>
                 )}
-                
+
                 <div className="flex items-center text-sm text-gray-600">
                   <MapPin className="h-4 w-4 mr-2" />
                   <span>{candidate.location || 'Not specified'}</span>
                 </div>
-                
+
                 <div className="flex items-center text-sm text-gray-600">
                   <Clock className="h-4 w-4 mr-2" />
                   <span>{formatDate(candidate.created_at || candidate.dateAdded)}</span>

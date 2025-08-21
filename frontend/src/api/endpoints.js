@@ -10,21 +10,21 @@ export const ENDPOINTS = {
 
   // Jobs
   JOBS: {
-    LIST: '/api/jobs',
-    RECENT: '/api/recent-jobs',
-    BY_ID: (id) => `/api/jobs/${id}`,
-    STATS: '/api/jobs/stats/summary',
-    CREATE: '/api/jobs',
-    UPDATE: (id) => `/api/jobs/${id}`,
+    LIST: '/api/v1/jobs',
+    RECENT: '/api/v1/recent-jobs',
+    BY_ID: (id) => `/api/v1/jobs/${id}`,
+    STATS: '/api/v1/jobs/stats/summary',
+    CREATE: '/api/v1/jobs',
+    UPDATE: (id) => `/api/v1/jobs/${id}`,
   },
 
   // Candidates
   CANDIDATES: {
-    LIST: '/candidates',
-    GET: (id) => `/candidates/${id}`,
-    CREATE: '/candidates',
-    UPDATE: (id) => `/candidates/${id}`,
-    DELETE: (id) => `/candidates/${id}`,
+    LIST: '/api/v1/candidates',
+    GET: (id) => `/api/v1/candidates/${id}`,
+    CREATE: '/api/v1/candidates',
+    UPDATE: (id) => `/api/v1/candidates/${id}`,
+    DELETE: (id) => `/api/v1/candidates/${id}`,
   },
 
   // Workflows

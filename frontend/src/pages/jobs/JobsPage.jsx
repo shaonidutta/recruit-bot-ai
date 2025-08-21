@@ -28,11 +28,11 @@ const JobsPage = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await jobsService.getAllJobs();
+      const response = await jobsService.getJobs();
       
-      if (response.success && response.data) {
-        setJobs(response.data);
-        setFilteredJobs(response.data);
+      if (response.success && response.data && response.data.jobs) {
+        setJobs(response.data.jobs);
+        setFilteredJobs(response.data.jobs);
       } else {
         setJobs([]);
         setFilteredJobs([]);

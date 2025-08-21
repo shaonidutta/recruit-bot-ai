@@ -21,12 +21,12 @@ const navigation = [
     icon: '👥',
     description: 'Candidate profiles'
   },
-  {
-    name: 'Settings',
-    href: '/settings',
-    icon: '⚙️',
-    description: 'Configuration'
-  }
+  // {
+  //   name: 'Settings',
+  //   href: '/settings',
+  //   icon: '⚙️',
+  //   description: 'Configuration'
+  // }
 ];
 
 const DashboardSidebar = ({ isOpen, onClose }) => {
@@ -55,9 +55,9 @@ const DashboardSidebar = ({ isOpen, onClose }) => {
       <nav className="mt-6 px-3">
         <div className="space-y-1">
           {navigation.map((item) => {
-            const isActive = location.pathname === item.href || 
-                           (item.href === '/dashboard' && location.pathname === '/');
-            
+            const isActive = location.pathname === item.href ||
+              (item.href === '/dashboard' && location.pathname === '/');
+
             return (
               <NavLink
                 key={item.name}

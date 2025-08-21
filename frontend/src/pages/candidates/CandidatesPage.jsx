@@ -77,10 +77,13 @@ const CandidatesPage = () => {
       const searchTerm = currentFilters.search.toLowerCase();
       filtered = filtered.filter(candidate => 
         (candidate.name && candidate.name.toLowerCase().includes(searchTerm)) ||
+        (candidate.first_name && candidate.first_name.toLowerCase().includes(searchTerm)) ||
+        (candidate.last_name && candidate.last_name.toLowerCase().includes(searchTerm)) ||
         (candidate.firstName && candidate.firstName.toLowerCase().includes(searchTerm)) ||
         (candidate.lastName && candidate.lastName.toLowerCase().includes(searchTerm)) ||
         (candidate.email && candidate.email.toLowerCase().includes(searchTerm)) ||
         (candidate.title && candidate.title.toLowerCase().includes(searchTerm)) ||
+        (candidate.current_role && candidate.current_role.toLowerCase().includes(searchTerm)) ||
         (candidate.currentPosition && candidate.currentPosition.toLowerCase().includes(searchTerm)) ||
         (candidate.skills && (
           Array.isArray(candidate.skills) 
@@ -112,9 +115,22 @@ const CandidatesPage = () => {
 
     // Experience filter
     if (currentFilters.experience) {
-      filtered = filtered.filter(candidate => 
-        candidate.experience && candidate.experience.toLowerCase() === currentFilters.experience.toLowerCase()
-      );
+      filtered = filtered.filter(candidate => {
+        // Handle both experience (string) and experience_years (number) fields
+        if (candidate.experience) {
+          return candidate.experience.toLowerCase() === currentFilters.experience.toLowerCase();
+        }
+        // Map experience_years to experience levels
+        if (candidate.experience_years !== undefined && candidate.experience_years !== null) {
+          let experienceLevel = '';
+          if (candidate.experience_years <= 2) experienceLevel = 'entry';
+          else if (candidate.experience_years <= 5) experienceLevel = 'mid';
+          else if (candidate.experience_years <= 10) experienceLevel = 'senior';
+          else experienceLevel = 'lead';
+          return experienceLevel === currentFilters.experience.toLowerCase();
+        }
+        return false;
+      });
     }
 
     // Job filter - this would filter candidates based on job requirements

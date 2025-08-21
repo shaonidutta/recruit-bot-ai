@@ -49,17 +49,12 @@ async def get_candidates(
         
         # Convert to response format
         candidate_responses = [
-            CandidateService.to_response(candidate).dict() 
+            CandidateService.to_response(candidate).model_dump(mode='json') 
             for candidate in candidates
         ]
         
         return send_success(
-            data={
-                "candidates": candidate_responses,
-                "total": len(candidate_responses),
-                "skip": skip,
-                "limit": limit
-            },
+            data=candidate_responses,
             message=f"Retrieved {len(candidate_responses)} candidates"
         )
     except Exception as e:
@@ -81,7 +76,7 @@ async def get_candidate(
             return send_not_found_error("Candidate not found")
         
         return send_success(
-            data={"candidate": CandidateService.to_response(candidate).dict()},
+            data={"candidate": CandidateService.to_response(candidate).model_dump(mode='json')},
             message="Candidate retrieved successfully"
         )
     except HTTPException:
@@ -109,7 +104,7 @@ async def create_candidate(
         new_candidate = await CandidateService.create_candidate(candidate_data)
         
         return send_success(
-            data={"candidate": CandidateService.to_response(new_candidate).dict()},
+            data={"candidate": CandidateService.to_response(new_candidate).model_dump(mode='json')},
             message="Candidate created successfully",
             status_code=201
         )
@@ -145,7 +140,7 @@ async def update_candidate(
             return send_error("Failed to update candidate", 500)
         
         return send_success(
-            data={"candidate": CandidateService.to_response(updated_candidate).dict()},
+            data={"candidate": CandidateService.to_response(updated_candidate).model_dump(mode='json')},
             message="Candidate updated successfully"
         )
     except HTTPException:
@@ -211,19 +206,12 @@ async def search_candidates(
         
         # Convert to response format
         candidate_responses = [
-            CandidateService.to_response(candidate).dict() 
+            CandidateService.to_response(candidate).model_dump(mode='json') 
             for candidate in candidates
         ]
         
         return send_success(
-            data={
-                "candidates": candidate_responses,
-                "total": len(candidate_responses),
-                "query": q,
-                "skills_filter": skills_list,
-                "skip": skip,
-                "limit": limit
-            },
+            data=candidate_responses,
             message=f"Found {len(candidate_responses)} candidates matching search criteria"
         )
     except Exception as e:
@@ -249,17 +237,12 @@ async def export_candidates(
         
         if format == "json":
             candidate_responses = [
-                CandidateService.to_response(candidate).dict() 
+                CandidateService.to_response(candidate).model_dump(mode='json') 
                 for candidate in candidates
             ]
             
             return send_success(
-                data={
-                    "candidates": candidate_responses,
-                    "total": len(candidate_responses),
-                    "export_format": "json",
-                    "active_only": active_only
-                },
+                data=candidate_responses,
                 message=f"Exported {len(candidate_responses)} candidates"
             )
         
