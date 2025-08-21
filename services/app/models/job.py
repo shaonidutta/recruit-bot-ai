@@ -23,7 +23,7 @@ class PyObjectId(ObjectId):
         return ObjectId(v)
 
     @classmethod
-    def __get_pydantic_json_schema__(cls, field_schema):
+    def __get_pydantic_json_schema__(cls, field_schema, handler):
         field_schema.update(type="string")
         return field_schema
 
@@ -45,7 +45,7 @@ class JobBase(BaseModel):
     # Additional fields for enrichment and parsing
     skills_required: Optional[List[str]] = []
     experience_years: Optional[int] = None
-    company_id: Optional[PyObjectId] = None  # Reference to Company document (NEW)
+    company_id: Optional[str] = None  # Reference to Company document (NEW)
     company_data: Optional[dict] = None  # Enriched company information (DEPRECATED - use company_id)
     parsed_data: Optional[dict] = None   # Parsed job description data
     via: Optional[str] = None            # Source platform (from scraping)
@@ -71,7 +71,7 @@ class JobUpdate(BaseModel):
     # Additional fields for enrichment and parsing
     skills_required: Optional[List[str]] = None
     experience_years: Optional[int] = None
-    company_id: Optional[PyObjectId] = None  # Reference to Company document (NEW)
+    company_id: Optional[str] = None  # Reference to Company document (NEW)
     company_data: Optional[dict] = None
     parsed_data: Optional[dict] = None
     via: Optional[str] = None

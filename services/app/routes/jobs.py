@@ -11,7 +11,7 @@ from ..utils.response_helper import send_success, send_error, send_not_found_err
 
 router = APIRouter()
 
-@router.get("/jobs", response_model=List[JobResponse])
+@router.get("/jobs")
 async def get_jobs(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
