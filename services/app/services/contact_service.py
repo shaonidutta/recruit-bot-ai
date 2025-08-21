@@ -340,9 +340,10 @@ class ContactService:
             async for doc in cursor:
                 results.append(ContactResponse(
                     id=str(doc["_id"]),
-                    company_id=str(doc["company_id"]),
+                    company_id=str(doc.get("company_id", "")),  # Use .get() with a default
                     **{k: v for k, v in doc.items() if k not in ["_id", "company_id"]}
                 ))
+
             return results
         except Exception as e:
             logger.error(f"❌ Failed to get_all_contacts: {e}")
