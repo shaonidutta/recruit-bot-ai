@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import LandingPage from '../pages/LandingPage.jsx';
 import LoginPage from '../pages/auth/LoginPage.jsx';
 import SignupPage from '../pages/auth/SignupPage.jsx';
 import DashboardPage from '../pages/dashboard/DashboardPage.jsx';
@@ -10,24 +11,22 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public Routes */}
+      <Route path={ROUTES.LANDING} element={<LandingPage />} />
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
-      
+
       {/* Protected Routes */}
-      <Route 
-        path={ROUTES.DASHBOARD} 
+      <Route
+        path={ROUTES.DASHBOARD}
         element={
           <ProtectedRoute>
             <DashboardPage />
           </ProtectedRoute>
-        } 
+        }
       />
-      
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
-      
-      {/* Catch all - redirect to dashboard */}
-      <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
+
+      {/* Catch all - redirect to landing */}
+      <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
     </Routes>
   );
 };
