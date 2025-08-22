@@ -25,6 +25,7 @@ from ..workflows.nodes.parsing import parsing_node
 from ..workflows.nodes.quality_check import quality_check_node
 from ..workflows.nodes.matching import matching_node
 from ..workflows.nodes.storage import storage_node
+from .outreach_email_service import send_outreach_emails  # NEW IMPORT
 
 from ..config.constants import DEFAULT_KEYWORDS
 
@@ -311,7 +312,13 @@ class UnifiedOrchestrator:
             logger.info(f"   Jobs stored: {len(final_state.get('stored_jobs', []))}")
             logger.info(f"   Matches found: {len(final_state.get('matched_jobs', []))}")
             logger.info(f"   Errors: {len(final_state.get('errors', []))}")
-            
+            # --- OUTREACH (FINAL STEP) ---
+            try:
+                outreach_summary = await send_outreach_emails(final_state.get("stored_jobs", []))
+            except Exception as outreach_err:
+                logger.error(f"Outreach step failed: {outreach_err}")
+                outreach_summary = {"enabled": False, "error": str(outreach_err)}
+            # --- END OUTREACH ---
             return {
                 "success": True,
                 "workflow_id": final_state.get('workflow_id', workflow_id),
@@ -319,6 +326,7 @@ class UnifiedOrchestrator:
                 "jobs_discovered": stats.get('total_jobs_discovered', 0),
                 "jobs_stored": len(final_state.get('stored_jobs', [])),
                 "matches_found": len(final_state.get('matched_jobs', [])),
+                "outreach": outreach_summary,  # NEW FIELD
                 "errors": final_state.get('errors', []),
                 "processing_time": stats.get('processing_time_seconds', 0)
             }

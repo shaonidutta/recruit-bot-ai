@@ -104,16 +104,16 @@ class ContactResponse(BaseModel):
     id: str
     name: str
     email: str
-    title: Optional[str]
+    title: Optional[str] = None  # Make optional
     company_id: str
-    phone: Optional[str]
-    linkedin_url: Optional[str]
-    department: Optional[str]
-    seniority: Optional[str]
-    apollo_id: Optional[str]
-    snov_id: Optional[str]
+    phone: Optional[str] = None  # Make optional
+    linkedin_url: Optional[str] = None  # Make optional
+    department: Optional[str] = None  # Make optional
+    seniority: Optional[str] = None  # Make optional
+    apollo_id: Optional[str] = None  # Make optional
+    snov_id: Optional[str] = None  # Make optional
     enrichment_source: str
-    confidence_score: Optional[float]
+    confidence_score: Optional[float] = None  # Make optional
     created_at: datetime
     updated_at: datetime
     
