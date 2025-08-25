@@ -3,6 +3,7 @@ Unified LangGraph Orchestrator
 Complete recruitment pipeline: Scraping → Processing → Matching → Storage
 Replaces both agent_orchestrator.py and base_workflow.py
 """
+import os
 import logging
 from typing import Dict, List, Any, TypedDict, Annotated
 from datetime import datetime, timezone
@@ -25,7 +26,7 @@ from ..workflows.nodes.parsing import parsing_node
 from ..workflows.nodes.quality_check import quality_check_node
 from ..workflows.nodes.matching import matching_node
 from ..workflows.nodes.storage import storage_node
-from .outreach_email_service import send_outreach_emails  # NEW IMPORT
+from .outreach_email_service import send_professional_outreach_email  # NEW IMPORT
 
 from ..config.constants import DEFAULT_KEYWORDS
 
@@ -252,6 +253,65 @@ class UnifiedOrchestrator:
                 state[key] = value
         return state
     
+    def _get_candidate_title(self, match: dict) -> str:
+        """Generate professional title for candidate based on match data"""
+        candidate_name = match.get("candidate_name", "")
+        if "senior" in candidate_name.lower() or match.get("score", 0) > 0.9:
+            return "Senior Developer"
+        elif "lead" in candidate_name.lower():
+            return "Lead Developer"
+        else:
+            return "Software Engineer"
+    
+    def _get_candidate_expertise(self, match: dict, job: dict) -> str:
+        """Generate expertise description for candidate"""
+        candidate_name = match.get("candidate_name", "")
+        job_title = job.get("title", "")
+        
+        # Extract key technologies from job title/description
+        technologies = []
+        if "react" in job_title.lower():
+            technologies.append("React.js")
+        if "typescript" in job_title.lower():
+            technologies.append("TypeScript")
+        if "python" in job_title.lower():
+            technologies.append("Python")
+        if "node" in job_title.lower():
+            technologies.append("Node.js")
+        
+        if not technologies:
+            technologies = ["modern web technologies", "full-stack development"]
+        
+        years = "6+" if "senior" in candidate_name.lower() else "5+" if "lead" in candidate_name.lower() else "4+"
+        tech_list = ", ".join(technologies[:3])  # Limit to 3 technologies
+        
+        return f"{years} years specializing in {tech_list}. Recently led successful projects involving scalable architecture and performance optimization, resulting in significant improvements in system efficiency."
+    
+    def _get_why_candidate_fits(self, match: dict, job: dict) -> str:
+        """Generate why candidate fits description"""
+        score = match.get("score", 0)
+        job_title = job.get("title", "")
+        
+        if score > 0.9:
+            return f"Exceptional alignment with your technical requirements and proven track record in similar roles. Their expertise directly matches the challenges outlined in your {job_title} position."
+        elif score > 0.8:
+            return f"Strong technical alignment with hands-on experience that directly addresses the key requirements for your {job_title} role."
+        else:
+            return f"Solid technical foundation with relevant experience that aligns well with your {job_title} position requirements."
+    
+    def _get_company_achievement(self, company: str) -> str:
+        """Generate company achievement based on company name"""
+        # Mock achievements for demo - in real implementation, this would query a database
+        achievements = {
+            "innovatetech": "the recent launch of FutureDesk",
+            "techcorp": "your successful Series B funding round",
+            "websolutions": "the launch of your new AI-powered platform",
+            "default": "your recent product innovations and market expansion"
+        }
+        
+        company_key = company.lower().replace(" ", "").replace("inc", "").replace("llc", "")
+        return achievements.get(company_key, achievements["default"])
+    
     # Main execution method
     async def run_complete_workflow(self, keywords: str = "Software Engineer") -> Dict[str, Any]:
         """Run the complete recruitment workflow"""
@@ -314,10 +374,207 @@ class UnifiedOrchestrator:
             logger.info(f"   Errors: {len(final_state.get('errors', []))}")
             # --- OUTREACH (FINAL STEP) ---
             try:
-                outreach_summary = await send_outreach_emails(final_state.get("stored_jobs", []))
+                # ALWAYS send email to abhijeet.kr.chaurasiya@gmail.com regardless of conditions
+                logger.info("📧 Preparing to send workflow summary email to abhijeet.kr.chaurasiya@gmail.com")
+                
+                # Get matched jobs with candidates for outreach
+                matched_jobs = final_state.get("matched_jobs", [])
+                
+                # Send professional outreach emails
+                outreach_summary = {"total_emails": 0, "successful_emails": 0, "failed_emails": 0, "details": []}
+                
+                # Check if outreach emails are enabled for candidate emails
+                outreach_enabled = os.getenv("OUTREACH_EMAIL_ENABLED", "false").lower() == "true"
+                
+                if outreach_enabled and matched_jobs:
+                    logger.info(f"📧 Processing {len(matched_jobs)} matched jobs for outreach emails")
+                    
+                    # Group candidates by job for professional outreach
+                    jobs_with_candidates = {}
+                    
+                    # Extract matches from job objects (matching node stores matches within jobs)
+                    for job in matched_jobs:
+                        job_matches = job.get("matches", [])
+                        job_id = job.get("id", job.get("_id", str(job.get("title", "unknown"))))
+                        logger.info(f"📧 Job '{job.get('title', 'Unknown')}' has {len(job_matches)} matches")
+                        
+                        for match in job_matches:
+                            match_score = match.get("score", 0)
+                            logger.info(f"📧 Candidate '{match.get('candidate_name', 'Unknown')}' score: {match_score}")
+                            
+                            if match_score >= 0.7:  # Only high-quality matches
+                                if job_id not in jobs_with_candidates:
+                                    jobs_with_candidates[job_id] = {
+                                        "job": job,
+                                        "candidates": []
+                                    }
+                                
+                                candidate_info = {
+                                    "name": match.get("candidate_name", "Unknown"),
+                                    "email": match.get("candidate_email", ""),
+                                    "score": match.get("score", 0),
+                                    "reasons": match.get("reasons", []),
+                                    "title": self._get_candidate_title(match),
+                                    "expertise": self._get_candidate_expertise(match, job),
+                                    "why_fit": self._get_why_candidate_fits(match, job)
+                                }
+                                jobs_with_candidates[job_id]["candidates"].append(candidate_info)
+                                logger.info(f"📧 Added candidate '{candidate_info['name']}' for outreach")
+                            else:
+                                logger.info(f"📧 Skipping candidate '{match.get('candidate_name', 'Unknown')}' - score {match_score} below 0.7 threshold")
+                    
+                    logger.info(f"📧 Found {len(jobs_with_candidates)} jobs with qualified candidates for outreach")
+                    
+                    # Send one professional email per job with all matched candidates
+                    for job_id, job_data in jobs_with_candidates.items():
+                        job = job_data["job"]
+                        candidates = job_data["candidates"]
+                        
+                        if job and candidates:
+                            recruiter_email = "abhijeet.kr.chaurasiya@gmail.com"  # Send to Abhijeet
+                            subject = f"Top Candidates for {job.get('title', 'Position')} at {job.get('company', 'Your Company')}"
+                            company_achievement = self._get_company_achievement(job.get('company', 'Your Company'))
+                            
+                            logger.info(f"📧 Sending outreach email for job '{job.get('title')}' with {len(candidates)} candidates")
+                            
+                            result = await send_professional_outreach_email(
+                                recruiter_email=recruiter_email,
+                                job_title=job.get("title", "Position"),
+                                company_name=job.get("company", "Your Company"),
+                                company_achievement=company_achievement,
+                                candidates=candidates,
+                                subject=subject
+                            )
+                            
+                            logger.info(f"📧 Email result: {result}")
+                            
+                            outreach_summary["total_emails"] += 1
+                            if result.get("success"):
+                                outreach_summary["successful_emails"] += 1
+                                logger.info(f"✅ Email sent successfully for job '{job.get('title')}'")
+                            else:
+                                outreach_summary["failed_emails"] += 1
+                                logger.error(f"❌ Email failed for job '{job.get('title')}': {result.get('error')}")
+                            
+                            outreach_summary["details"].append({
+                                "job_title": job.get("title"),
+                                "company": job.get("company"),
+                                "recruiter_email": recruiter_email,
+                                "candidates_count": len(candidates),
+                                "success": result.get("success", False),
+                                "error": result.get("error")
+                            })
+                        else:
+                            logger.warning(f"📧 Skipping email for job_id {job_id} - missing job or candidates data")
+                else:
+                    if not outreach_enabled:
+                        logger.info("📧 Candidate outreach emails are disabled (OUTREACH_EMAIL_ENABLED=false)")
+                    if not matched_jobs:
+                        logger.info("📧 No matched jobs found for outreach emails")
+                
+                # ALWAYS send summary email to abhijeet.kr.chaurasiya@gmail.com
+                try:
+                    from .outreach_email_service import send_sync_email
+                    
+                    # Prepare workflow summary
+                    total_jobs = len(final_state.get('stored_jobs', []))
+                    total_matches = sum(len(job.get('matches', [])) for job in matched_jobs)
+                    high_quality_matches = sum(1 for job in matched_jobs for match in job.get('matches', []) if match.get('score', 0) >= 0.7)
+                    
+                    summary_subject = f"AI Recruitment Workflow Summary - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                    summary_body = f"""
+                    <html>
+                    <body>
+                    <h2>🤖 AI Recruitment Workflow Summary</h2>
+                    <p><strong>Execution Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                    
+                    <h3>📊 Workflow Statistics</h3>
+                    <ul>
+                        <li><strong>Jobs Discovered:</strong> {stats.get('total_jobs_discovered', 0)}</li>
+                        <li><strong>Jobs Stored:</strong> {total_jobs}</li>
+                        <li><strong>Total Matches Found:</strong> {total_matches}</li>
+                        <li><strong>High-Quality Matches (≥0.7):</strong> {high_quality_matches}</li>
+                        <li><strong>Outreach Emails Sent:</strong> {outreach_summary.get('successful_emails', 0)}</li>
+                        <li><strong>Failed Emails:</strong> {outreach_summary.get('failed_emails', 0)}</li>
+                    </ul>
+                    
+                    <h3>⚙️ Configuration Status</h3>
+                    <ul>
+                        <li><strong>Outreach Enabled:</strong> {outreach_enabled}</li>
+                        <li><strong>Email Service:</strong> {'✅ Active' if os.getenv('EMAIL_USERNAME') and os.getenv('EMAIL_PASSWORD') else '❌ Not Configured'}</li>
+                    </ul>
+                    
+                    <h3>🔍 Recent Job Matches</h3>
+                    """
+                    
+                    # Add details about recent matches
+                    if matched_jobs:
+                        for job in matched_jobs[:3]:  # Show top 3 jobs
+                            job_matches = job.get('matches', [])
+                            if job_matches:
+                                summary_body += f"""
+                                <h4>{job.get('title', 'Unknown Position')} at {job.get('company', 'Unknown Company')}</h4>
+                                <ul>
+                                """
+                                for match in job_matches[:2]:  # Show top 2 candidates per job
+                                    summary_body += f"<li>{match.get('candidate_name', 'Unknown')} - Score: {match.get('score', 0):.2f}</li>"
+                                summary_body += "</ul>"
+                    else:
+                        summary_body += "<p>No job matches found in this workflow execution.</p>"
+                    
+                    summary_body += """
+                    <hr>
+                    <p><em>This is an automated summary from the AI Recruitment Agent workflow.</em></p>
+                    </body>
+                    </html>
+                    """
+                    
+                    # Send summary email
+                    summary_result = send_sync_email(
+                        to_email="abhijeet.kr.chaurasiya@gmail.com",
+                        subject=summary_subject,
+                        body=summary_body
+                    )
+                    
+                    if summary_result:
+                        logger.info("✅ Workflow summary email sent successfully to abhijeet.kr.chaurasiya@gmail.com")
+                        outreach_summary["summary_email_sent"] = True
+                    else:
+                        logger.error("❌ Failed to send workflow summary email")
+                        outreach_summary["summary_email_sent"] = False
+                        
+                except Exception as summary_email_err:
+                    logger.error(f"❌ Failed to send summary email: {summary_email_err}")
+                    outreach_summary["summary_email_sent"] = False
+                    outreach_summary["summary_email_error"] = str(summary_email_err)
+                     
             except Exception as outreach_err:
-                logger.error(f"Outreach step failed: {outreach_err}")
+                logger.error(f"📧 Outreach step failed: {outreach_err}")
                 outreach_summary = {"enabled": False, "error": str(outreach_err)}
+                
+                # Even if outreach fails, try to send summary email
+                try:
+                    from .outreach_email_service import send_sync_email
+                    error_subject = f"AI Recruitment Workflow Error - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                    error_body = f"""
+                    <html>
+                    <body>
+                    <h2>⚠️ AI Recruitment Workflow Error</h2>
+                    <p><strong>Execution Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                    <p><strong>Error:</strong> {str(outreach_err)}</p>
+                    <p><em>Please check the system logs for more details.</em></p>
+                    </body>
+                    </html>
+                    """
+                    
+                    send_sync_email(
+                        to_email="abhijeet.kr.chaurasiya@gmail.com",
+                        subject=error_subject,
+                        body=error_body
+                    )
+                    logger.info("📧 Error notification email sent to abhijeet.kr.chaurasiya@gmail.com")
+                except:
+                    logger.error("📧 Failed to send error notification email")
             # --- END OUTREACH ---
             return {
                 "success": True,

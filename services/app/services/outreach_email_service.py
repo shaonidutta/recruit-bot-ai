@@ -1,170 +1,359 @@
-import os
-import asyncio
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import smtplib
 from dotenv import load_dotenv
-import resend
+import os
+import logging
 from typing import List, Dict, Any
 
-from ..config.database import connect_to_mongo, close_mongo_connection
-from ..services.contact_service import contact_service
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 load_dotenv()
 
-# Config
-ENABLED = os.getenv("OUTREACH_EMAIL_ENABLED", "false").lower() == "true"
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-FROM_EMAIL = os.getenv("OUTREACH_FROM", "onboarding@resend.dev")  # Use Resend's default domain
-MAX_CONTACTS = int(os.getenv("OUTREACH_MAX_CONTACTS", "5"))
 
-# Set API key using environment variable (like the template)
-if RESEND_API_KEY:
-    resend.api_key = RESEND_API_KEY
-else:
-    print("⚠️ RESEND_API_KEY not found in environment variables")
+SMTP_HOST = os.getenv("SMTP_SERVER")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
+SMTP_USER = "abhijeet.kr.chaurasiya@gmail.com"  # Fixed sender email
+SMTP_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-# Debug info
-print(f"🔑 RESEND_API_KEY present: {bool(RESEND_API_KEY)}")
-print(f"🔑 RESEND_API_KEY length: {len(RESEND_API_KEY) if RESEND_API_KEY else 0}")
-print(f"🔑 RESEND_API_KEY starts with: {RESEND_API_KEY[:10] if RESEND_API_KEY else 'None'}...")
-print(f"📧 FROM_EMAIL: {FROM_EMAIL}")
-print(f"⚙️ ENABLED: {ENABLED}")
 
-# Build email payload
-def _build_message(contact_email: str, contact_name: str) -> dict:
-    subject = "AI Recruitment Agent – Outreach"
-    html = f"""
-    <p>Hi {contact_name or 'there'},</p>
-    <p>This is a <strong>test outreach email</strong> from the AI Recruitment Agent.<br/>
-    If you received this, the Resend integration is working ✅.</p>
-    <p>Regards,<br/>Outreach Bot</p>"""
-    
-    # Use exact format from Resend template
-    payload = {
-        "from": FROM_EMAIL,  # Use simple string format like template
-        "to": contact_email,  # Use string, not list
-        "subject": subject,
-        "html": html
-    }
-    print(f"📦 Built payload: {payload}")
-    return payload
+# async def send_email(
+#     subject: str,
+#     recipient: str,
+#     body: str,
+# ):
+#     message = MIMEMultipart()
+#     message["From"] = SMTP_USER
+#     message["To"] = recipient
+#     message["Subject"] = subject
 
-# Send email
-def _send_email(payload: dict) -> bool:
-    if not RESEND_API_KEY:
-        print("❌ RESEND_API_KEY not set")
-        return False
-    
-    print(f"🚀 Attempting to send email with payload: {payload}")
-    print(f"🔑 Using API key: {RESEND_API_KEY[:10]}...")
-    
+#     message.attach(MIMEText(body, "html"))
+
+#     await aiosmtplib.send(
+#         message,
+#         hostname=SMTP_HOST,
+#         port=SMTP_PORT,
+#         username=SMTP_USER,
+#         password=SMTP_PASSWORD,
+#         start_tls=True,
+#     )
+
+
+def send_sync_email(
+    subject: str,
+    recipient: str,
+    body: str,
+):
+    message = MIMEMultipart()
+    message["From"] = SMTP_USER
+    message["To"] = recipient
+    message["Subject"] = subject
+
+    message.attach(MIMEText(body, "html"))
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.send_message(message)
+
+
+def test_email_sending(recipient_email: str):
+    """
+    Test function to verify email sending functionality
+    """
+    subject = "Test Email from AI Recruitment Agent"
+    body = """
+    <!DOCTYPE html>
+    <html>
+    <body>
+        <h1>Hello World!</h1>
+        <p>This is a test email from AI Recruitment Agent system.</p>
+        <p>If you received this email, the email service is working correctly.</p>
+    </body>
+    </html>
+    """
+
     try:
-        # Use the exact format from your Resend template
-        email = resend.Emails.send({
-            "from": payload["from"],
-            "to": payload["to"], 
-            "subject": payload["subject"],
-            "html": payload["html"]
-        })
+        send_sync_email(subject=subject, recipient=recipient_email, body=body)
+        logger.info(f"✅ Test email sent successfully to {recipient_email}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Error sending test email: {str(e)}")
+        return False
+
+
+def get_professional_outreach_template(
+    job_title: str,
+    company_name: str,
+    company_achievement: str,
+    candidates: list
+) -> str:
+    """Generate professional outreach email template matching the user's exact format"""
+    
+    # Build candidate profiles section
+    candidate_sections = []
+    for i, candidate in enumerate(candidates, 1):
+        name = candidate.get("name", "Candidate")
+        title = candidate.get("title", "Developer")
+        expertise = candidate.get("expertise", "Strong technical background")
+        why_fit = candidate.get("why_fit", "Great match for your requirements")
         
-        print(f"📧 Resend response: {email}")
-        print(f"📧 Resend response type: {type(email)}")
+        candidate_section = f"""{i}. {name} | {title}
+Expertise: {expertise}
+Why they fit: {why_fit}"""
+        candidate_sections.append(candidate_section)
+    
+    candidates_text = "\n\n".join(candidate_sections)
+    
+    # Achievement line
+    achievement_line = f"Congratulations on {company_achievement}! It looks like a game-changer, and it's exciting to see {company_name} pushing the industry forward."
+    
+    template = f"""Hi [Recruiter Name],
+
+{achievement_line}
+
+I'm reaching out regarding your open {job_title} position. I noticed the key requirements include deep expertise in the technologies outlined in your job description.
+
+I've identified {len(candidates)} candidate{'s' if len(candidates) > 1 else ''} from our talent pool who precisely match these qualifications and could be instrumental in scaling the {company_name} platform.
+
+{candidates_text}
+
+Would you be open to a brief 15-minute call next week to discuss their profiles in more detail?
+
+Best regards,
+Abhijeet Kumar Chaurasiya
+AI Recruitment Partner"""
+    
+    return template
+
+
+async def send_job_match_email(
+    candidate_id: str,
+    job_id: str,
+    recipient_email: str,
+    match_score: float,
+    dashboard_link: str = None,
+) -> Dict[str, Any]:
+    """
+    Send a job match notification email to the candidate
+    """
+    try:
+        # Get database connection
+        database = await get_database()
         
-        # Check if we got a successful response with an ID
-        if hasattr(email, 'id') or (isinstance(email, dict) and email.get("id")):
-            email_id = email.id if hasattr(email, 'id') else email.get('id')
-            print(f"✅ Email sent successfully with ID: {email_id}")
-            return True
-        else:
-            print(f"❌ Email send failed - no ID returned: {email}")
+        # Get candidate data
+        candidate_collection = database.get_collection("candidates")
+        candidate = await candidate_collection.find_one({"_id": ObjectId(candidate_id)})
+        
+        if not candidate:
+            logger.error(f"Candidate not found: {candidate_id}")
             return False
-            
-    except resend.exceptions.ResendError as re:
-        print(f"❌ ResendError occurred:")
-        print(f"   📋 Error message: {re}")
-        print(f"   📋 Error args: {re.args}")
-        print(f"   📋 Error dir: {dir(re)}")
-        if hasattr(re, 'message'):
-            print(f"   📋 Error message attr: {re.message}")
-        if hasattr(re, 'status_code'):
-            print(f"   📋 Error status_code: {re.status_code}")
-        if hasattr(re, 'response'):
-            print(f"   📋 Error response: {re.response}")
-        if hasattr(re, 'details'):
-            print(f"   📋 Error details: {re.details}")
-        return False
-    except Exception as e:
-        print(f"❌ General error occurred:")
-        print(f"   📋 Error message: {e}")
-        print(f"   📋 Error type: {type(e)}")
-        print(f"   📋 Error args: {e.args}")
-        print(f"   📋 Error dir: {dir(e)}")
-        return False
-
-# Outreach workflow
-async def send_outreach_emails(stored_jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
-    summary = {
-        "enabled": ENABLED,
-        "contacts_targeted": 0,
-        "emails_attempted": 0,
-        "emails_sent": 0,
-        "errors": [],
-        "jobs_context": len(stored_jobs or []),
-    }
-
-    print(f"[Outreach] Start | enabled={ENABLED} jobs={summary['jobs_context']} max_contacts={MAX_CONTACTS}")
-
-    if not ENABLED:
-        return summary
-    if not RESEND_API_KEY:
-        summary["errors"].append("missing_resend_api_key")
-        return summary
-
-    try:
-        contacts = await contact_service.get_all_contacts(limit=MAX_CONTACTS)
-        print(f"🔍 Loaded {len(contacts)} contacts from database")
-    except Exception as e:
-        summary["errors"].append("contacts_load_failed")
-        print(f"❌ Error loading contacts: {e}")
-        return summary
-
-    if not contacts:
-        print("[Outreach] No contacts available")
-        return summary
-
-    for idx, c in enumerate(contacts, start=1):
-        email = getattr(c, "email", None)
-        name = getattr(c, "name", None)
-        print(f"🔍 Processing contact {idx}: email={email}, name={name}")
         
-        if not email:
-            print(f"⚠️ Skipping contact {idx} - no email")
-            continue
+        # Get job data
+        job_collection = database.get_collection("jobs")
+        job = await job_collection.find_one({"_id": ObjectId(job_id)})
+        
+        
+        if not job:
+            logger.error(f"Job not found: {job_id}")
+            return False
+        
+        candidate_name = candidate.get("name", candidate.get("email", "Candidate"))
+        job_title = job.get("title", "Position")
+        company_name = job.get("company", "Company")
+        job_url = job.get("url", "#")
+        
+        # Generate email content
+        subject = f"🎯 Perfect Job Match: {job_title} at {company_name}"
+        body = get_job_match_email_template(
+            candidate_name=candidate_name,
+            job_title=job_title,
+            company_name=company_name,
+            match_score=match_score,
+            job_url=job_url,
+            dashboard_link=dashboard_link,
+        )
+        
+        # Send email
+        send_sync_email(subject=subject, recipient=recipient_email, body=body)
+        
+        logger.info(f"Job match email sent successfully to {recipient_email} for job {job_id}")
+        return True
+        
+    except Exception as e:
+         logger.error(f"Error sending job match email: {str(e)}")
+         return False
 
-        summary["contacts_targeted"] += 1
-        payload = _build_message(email, name)
-        summary["emails_attempted"] += 1
-        print(f"[Outreach] [{idx}] Sending to: {email}")
 
-        if _send_email(payload):
-            summary["emails_sent"] += 1
-            print(f"[{idx}] ✅ Sent -> {email}")
-        else:
-            summary["errors"].append(f"send_fail:{email}")
-            print(f"[{idx}] ❌ Fail -> {email}")
-
-    print(
-        f"[Outreach Summary] targeted={summary['contacts_targeted']} "
-        f"attempted={summary['emails_attempted']} sent={summary['emails_sent']} "
-        f"errors={len(summary['errors'])}"
-    )
-    return summary
-
-# Main entry
-async def main():
-    await connect_to_mongo()
+async def send_candidate_outreach_email(
+    candidate_email: str,
+    candidate_name: str,
+    subject: str = None,
+    custom_message: str = None,
+) -> bool:
+    """
+    Send a general outreach email to a candidate
+    """
     try:
-        await send_outreach_emails([])
-    finally:
-        await close_mongo_connection()
+        if not subject:
+            subject = "Exciting Career Opportunities Await You!"
+        
+        if not custom_message:
+            custom_message = "We have some exciting job opportunities that might be perfect for you."
+        
+        body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Career Opportunity</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fa;">
+            <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+                    <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 300; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        🚀 Career Opportunities
+                    </h1>
+                </div>
+                
+                <div style="padding: 40px 30px;">
+                    <h2 style="color: #2c3e50; font-size: 24px; font-weight: 400; margin: 0 0 20px 0; line-height: 1.4;">
+                        Hello {candidate_name},
+                    </h2>
+                    
+                    <p style="color: #5a6c7d; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+                        {custom_message}
+                    </p>
+                    
+                    <div style="background: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 30px 0; border-radius: 0 8px 8px 0;">
+                        <p style="margin: 0; color: #6c757d; font-size: 14px; line-height: 1.5;">
+                            💡 <strong>Why choose us?</strong> We use AI-powered matching to find opportunities that truly align with your skills and career goals.
+                        </p>
+                    </div>
+                    
+                    <p style="color: #5a6c7d; font-size: 16px; line-height: 1.6; margin: 25px 0 0 0;">
+                        Best regards,<br>
+                        <strong>AI Recruitment Agent Team</strong>
+                    </p>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e9ecef;">
+                    <p style="margin: 0; font-size: 12px; color: #6c757d; line-height: 1.4;">
+                        This is an automated email from <strong>AI Recruitment Agent</strong><br>
+                        <span style="color: #adb5bd;">© 2025 AI Recruitment Agent. All rights reserved.</span>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        send_sync_email(subject=subject, recipient=candidate_email, body=body)
+        logger.info(f"Outreach email sent successfully to {candidate_email}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error sending outreach email: {str(e)}")
+        return False
 
+
+async def send_professional_outreach_email(
+    recruiter_email: str,
+    job_title: str,
+    company_name: str,
+    company_achievement: str,
+    candidates: List[Dict[str, Any]],
+    subject: str = None
+) -> Dict[str, Any]:
+    """
+    Send professional outreach email to recruiter with candidate profiles
+    """
+    try:
+        if not subject:
+            subject = f"Top {len(candidates)} candidate{'s' if len(candidates) > 1 else ''} for {job_title} at {company_name}"
+        
+        body = get_professional_outreach_template(
+            job_title=job_title,
+            company_name=company_name,
+            company_achievement=company_achievement,
+            candidates=candidates
+        )
+        
+        send_sync_email(subject=subject, recipient=recruiter_email, body=body)
+        logger.info(f"Professional outreach email sent successfully to {recruiter_email}")
+        return {"success": True, "message": f"Email sent to {recruiter_email}"}
+        
+    except Exception as e:
+        error_msg = f"Error sending professional outreach email: {str(e)}"
+        logger.error(error_msg)
+        return {"success": False, "error": error_msg}
+
+
+async def send_outreach_emails(
+    candidates: list,
+    subject: str = None,
+    custom_message: str = None,
+) -> dict:
+    """
+    Send outreach emails to multiple candidates
+    
+    Args:
+        candidates: List of candidate dictionaries with 'email' and 'name' fields
+        subject: Email subject (optional, uses default if not provided)
+        custom_message: Custom message to include in the email
+    
+    Returns:
+        dict: Summary of email sending results
+    """
+    results = {
+        "total_candidates": len(candidates),
+        "emails_sent": 0,
+        "emails_failed": 0,
+        "failed_emails": []
+    }
+    
+    logger.info(f"Starting bulk email outreach to {len(candidates)} candidates")
+    
+    for candidate in candidates:
+        try:
+            candidate_email = candidate.get('email')
+            candidate_name = candidate.get('name', 'Candidate')
+            
+            if not candidate_email:
+                logger.warning(f"Skipping candidate with missing email: {candidate}")
+                results["emails_failed"] += 1
+                results["failed_emails"].append({"candidate": candidate, "reason": "Missing email"})
+                continue
+            
+            success = await send_candidate_outreach_email(
+                candidate_email=candidate_email,
+                candidate_name=candidate_name,
+                subject=subject,
+                custom_message=custom_message
+            )
+            
+            if success:
+                results["emails_sent"] += 1
+            else:
+                results["emails_failed"] += 1
+                results["failed_emails"].append({"candidate": candidate, "reason": "Send failed"})
+                
+        except Exception as e:
+            logger.error(f"Error processing candidate {candidate}: {str(e)}")
+            results["emails_failed"] += 1
+            results["failed_emails"].append({"candidate": candidate, "reason": str(e)})
+    
+    logger.info(f"Bulk email outreach completed. Sent: {results['emails_sent']}, Failed: {results['emails_failed']}")
+    return results
+
+
+# Example usage function
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Test the email service
+    test_email = "test@example.com"
+    print(f"Testing email service with {test_email}...")
+    test_email_sending(test_email)

@@ -6,7 +6,7 @@ import JobsList from './components/JobsList';
 import { useJobs } from '../../hooks/useJobs';
 
 const DashboardPage = () => {
-  const { refetch } = useJobs();
+  const { jobs, loading, error, refetch, fetchRecentJobs, searchJobs, pagination } = useJobs();
 
   const handleWorkflowComplete = (result) => {
     // Refresh jobs data after workflow completion
@@ -43,7 +43,14 @@ const DashboardPage = () => {
         <WorkflowTrigger onWorkflowComplete={handleWorkflowComplete} />
 
         {/* Jobs List */}
-        <JobsList />
+        <JobsList 
+          jobs={jobs}
+          loading={loading}
+          error={error}
+          fetchRecentJobs={fetchRecentJobs}
+          searchJobs={searchJobs}
+          pagination={pagination}
+        />
 
       </div>
     </DashboardLayout>

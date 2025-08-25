@@ -17,13 +17,13 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
         state["matched_jobs"] = []
         return state
 
-    # Mock candidates for demo
+    # Mock candidates for demo (with email addresses for outreach)
     mock_candidates = [
-        {"id": "1", "name": "Rahul Sharma", "skills": ["Python", "React"], "experience": 3},
-        {"id": "2", "name": "Priya Patel", "skills": ["Java", "Spring"], "experience": 5},
-        {"id": "3", "name": "Amit Kumar", "skills": ["JavaScript", "Node.js"], "experience": 2},
-        {"id": "4", "name": "Sneha Singh", "skills": ["Python", "Django"], "experience": 4},
-        {"id": "5", "name": "Vikram Gupta", "skills": ["React", "TypeScript"], "experience": 6}
+        {"id": "1", "name": "Rahul Sharma", "email": "rahul.sharma@example.com", "skills": ["Python", "React"], "experience": 3},
+        {"id": "2", "name": "Priya Patel", "email": "priya.patel@example.com", "skills": ["Java", "Spring"], "experience": 5},
+        {"id": "3", "name": "Amit Kumar", "email": "amit.kumar@example.com", "skills": ["JavaScript", "Node.js"], "experience": 2},
+        {"id": "4", "name": "Sneha Singh", "email": "sneha.singh@example.com", "skills": ["Python", "Django"], "experience": 4},
+        {"id": "5", "name": "Vikram Gupta", "email": "vikram.gupta@example.com", "skills": ["React", "TypeScript"], "experience": 6}
     ]
 
     matched_jobs = []
