@@ -41,6 +41,8 @@ openai
 langchain
 langchain-openai
 scikit-learn
+numpy
+sentence-transformers  # Free local embeddings alternative to OpenAI
 
 # Document processing
 python-docx

@@ -17,7 +17,7 @@ OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "1000"))
 OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.1"))  # Low temperature for consistent results
 
 if not OPENAI_API_KEY:
-    raise ValueError("❌ OPENAI_API_KEY is not set. Please add it to your .env file.")
+    raise ValueError(" OPENAI_API_KEY is not set. Please add it to your .env file.")
 
 # Global OpenAI client
 _openai_client: Optional[AsyncOpenAI] = None

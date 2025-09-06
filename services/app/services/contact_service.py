@@ -226,24 +226,9 @@ class ContactService:
             logger.error(f"❌ Failed to find contact by Apollo ID {apollo_id}: {e}")
             return None
     
-    async def find_by_snov_id(self, snov_id: str) -> Optional[ContactResponse]:
-        """Find contact by Snov ID (API deduplication)"""
-        try:
-            collection = await self._get_collection()
-            contact = await collection.find_one({"snov_id": snov_id})
-            
-            if contact:
-                logger.info(f"🔍 Found existing contact by Snov ID: {snov_id}")
-                return ContactResponse(
-                    id=str(contact["_id"]),
-                    company_id=str(contact["company_id"]),
-                    **{k: v for k, v in contact.items() if k not in ["_id", "company_id"]}
-                )
-            return None
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to find contact by Snov ID {snov_id}: {e}")
-            return None
+    # async def find_by_snov_id(self, snov_id: str) -> Optional[ContactResponse]:
+    #     """Find contact by Snov ID (API deduplication) - REMOVED: Snov.io not implemented"""
+    #     pass
     
     # Company Relationship Methods
     
@@ -283,12 +268,12 @@ class ContactService:
                     logger.info(f"🔄 Using existing contact (Apollo): {existing.name}")
                     return existing
             
-            # Try to find by Snov ID
-            if contact_data.snov_id:
-                existing = await self.find_by_snov_id(contact_data.snov_id)
-                if existing:
-                    logger.info(f"🔄 Using existing contact (Snov): {existing.name}")
-                    return existing
+            # # Try to find by Snov ID - REMOVED: Snov.io not implemented
+            # if contact_data.snov_id:
+            #     existing = await self.find_by_snov_id(contact_data.snov_id)
+            #     if existing:
+            #         logger.info(f"🔄 Using existing contact (Snov): {existing.name}")
+            #         return existing
             
             # Create new contact
             logger.info(f"🆕 Creating new contact: {contact_data.name}")

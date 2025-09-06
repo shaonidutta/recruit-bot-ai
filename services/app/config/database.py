@@ -29,7 +29,7 @@ async def connect_to_mongo():
 
         # Hide credentials in logs for security
         safe_uri = mongo_uri.replace(mongo_uri.split("@")[0].split("//")[1], "***:***") if "@" in mongo_uri else mongo_uri
-        logger.info(f"📍 Database URI: {safe_uri}")
+        logger.info(f" Database URI: {safe_uri}")
 
         # Connect to MongoDB with Motor AsyncIOMotorClient
         db.client = AsyncIOMotorClient(
@@ -53,14 +53,14 @@ async def connect_to_mongo():
 
         db.database = db.client[db_name]
 
-        logger.info(f"✅ MongoDB Connected successfully!")
-        logger.info(f"📊 Database Name: {db_name}")
+        logger.info(f" MongoDB Connected successfully!")
+        logger.info(f" Database Name: {db_name}")
 
     except ConnectionFailure as e:
-        logger.error(f"🔴 Database connection failed: {e}")
+        logger.error(f" Database connection failed: {e}")
         raise
     except Exception as e:
-        logger.error(f"🔴 Database connection failed: {e}")
+        logger.error(f" Database connection failed: {e}")
         raise
 
 async def close_mongo_connection():

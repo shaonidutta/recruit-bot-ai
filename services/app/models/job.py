@@ -30,7 +30,7 @@ class PyObjectId(ObjectId):
 class JobBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     company: str = Field(..., min_length=1, max_length=100)
-    url: str = Field(..., min_length=1)  # Changed from HttpUrl to str for MongoDB compatibility
+    url: Optional[str] = Field(None)  # Optional URL field for MongoDB compatibility
     description: Optional[str] = None
     location: Optional[str] = None
     source: Optional[str] = None  # linkedin, indeed, etc.
@@ -47,11 +47,29 @@ class JobBase(BaseModel):
     experience_years: Optional[int] = None
     company_id: Optional[str] = None  # Reference to Company document (NEW)
     company_data: Optional[dict] = None  # Enriched company information (DEPRECATED - use company_id)
-    parsed_data: Optional[dict] = None   # Parsed job description data
     via: Optional[str] = None            # Source platform (from scraping)
     raw_data: Optional[dict] = None      # Original scraped data
     processing_status: Optional[str] = "discovered"  # discovered, enriched, parsed, matched
     workflow_id: Optional[str] = None    # ID of the workflow run that discovered this job
+
+    # NEW: Enhanced salary fields
+    min_salary: Optional[int] = None
+    max_salary: Optional[int] = None
+    salary_type: Optional[str] = None  # "annual", "hourly", "contract"
+    currency: Optional[str] = "USD"
+    equity_mentioned: Optional[bool] = False
+    benefits_mentioned: Optional[bool] = False
+
+    # NEW: Enhanced skills fields
+    technical_skills: Optional[List[str]] = []
+    frameworks: Optional[List[str]] = []
+    databases: Optional[List[str]] = []
+    cloud_platforms: Optional[List[str]] = []
+    tools: Optional[List[str]] = []
+    methodologies: Optional[List[str]] = []
+    soft_skills: Optional[List[str]] = []
+    experience_years_required: Optional[int] = None
+    education_requirements: Optional[List[str]] = []
 
 class JobCreate(JobBase):
     pass
@@ -74,7 +92,6 @@ class JobUpdate(BaseModel):
     experience_years: Optional[int] = None
     company_id: Optional[str] = None  # Reference to Company document (NEW)
     company_data: Optional[dict] = None
-    parsed_data: Optional[dict] = None
     via: Optional[str] = None
     raw_data: Optional[dict] = None
     processing_status: Optional[str] = None
@@ -337,3 +354,63 @@ class JobService:
             created_at=job.created_at,
             updated_at=job.updated_at
         )
+
+    @classmethod
+    async def find_duplicate_job(cls, title: str, company: str, url: str = None) -> Optional[JobInDB]:
+        """
+        Check if a job already exists based on title, company, and optionally URL
+        Returns the existing job if found, None otherwise
+        """
+        collection = cls.get_collection()
+
+        try:
+            # Create query to find potential duplicates
+            query = {
+                "title": {"$regex": f"^{title.strip()}$", "$options": "i"},  # Case-insensitive exact match
+                "company": {"$regex": f"^{company.strip()}$", "$options": "i"},  # Case-insensitive exact match
+                "is_active": True  # Only check active jobs
+            }
+
+            # If URL is provided, include it in the query
+            if url and url.strip():
+                query["url"] = url.strip()
+
+            # Find the most recent matching job
+            job_doc = await collection.find_one(query, sort=[("created_at", -1)])
+
+            if job_doc:
+                # Convert ObjectId fields to strings for Pydantic validation
+                if job_doc.get('company_id') and isinstance(job_doc['company_id'], ObjectId):
+                    job_doc['company_id'] = str(job_doc['company_id'])
+
+                return JobInDB(**job_doc)
+
+            return None
+
+        except Exception as e:
+            # Log error but don't fail the workflow
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error checking for duplicate job: {e}")
+            return None
+
+    @classmethod
+    async def create_job_with_deduplication(cls, job_data: JobCreate) -> tuple[JobInDB, bool]:
+        """
+        Create a new job with deduplication check
+        Returns (job, is_new) where is_new indicates if this is a newly created job
+        """
+        # Check for existing job
+        existing_job = await cls.find_duplicate_job(
+            title=job_data.title,
+            company=job_data.company,
+            url=job_data.url
+        )
+
+        if existing_job:
+            # Job already exists, return existing job
+            return existing_job, False
+
+        # Job doesn't exist, create new one
+        new_job = await cls.create_job(job_data)
+        return new_job, True

@@ -38,10 +38,10 @@ class Contact(BaseModel):
     
     # External API IDs for deduplication
     apollo_id: Optional[str] = Field(None, description="Apollo.io person ID")
-    snov_id: Optional[str] = Field(None, description="Snov.io contact ID")
+    # snov_id: Optional[str] = Field(None, description="Snov.io contact ID")  # Removed - not implemented
     
     # Metadata
-    enrichment_source: str = Field(default="manual", description="Source of enrichment (apollo, snov, manual)")
+    enrichment_source: str = Field(default="manual", description="Source of enrichment (apollo, manual)")
     confidence_score: Optional[float] = Field(None, description="Confidence score from enrichment API")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

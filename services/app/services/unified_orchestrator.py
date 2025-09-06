@@ -5,6 +5,8 @@ Replaces both agent_orchestrator.py and base_workflow.py
 """
 import os
 import logging
+import asyncio
+
 from typing import Dict, List, Any, TypedDict, Annotated
 from datetime import datetime, timezone
 from langgraph.graph import StateGraph, END
@@ -26,7 +28,7 @@ from ..workflows.nodes.parsing import parsing_node
 from ..workflows.nodes.quality_check import quality_check_node
 from ..workflows.nodes.matching import matching_node
 from ..workflows.nodes.storage import storage_node
-from .outreach_email_service import send_professional_outreach_email  # NEW IMPORT
+from .outreach_email_service import send_professional_outreach_email, send_sync_email  # NEW IMPORT
 
 from ..config.constants import DEFAULT_KEYWORDS
 
@@ -49,6 +51,7 @@ class UnifiedRecruitmentState(TypedDict):
     parsed_jobs: List[Dict[str, Any]]
     quality_checked_jobs: List[Dict[str, Any]]
     matched_jobs: List[Dict[str, Any]]
+    outreach_results: Dict[str, Any]  # Email outreach results
     stored_jobs: List[Dict[str, Any]]
 
     # Workflow metadata
@@ -87,6 +90,7 @@ class UnifiedOrchestrator:
         workflow.add_node("parse", self._parsing_wrapper)
         workflow.add_node("quality_check", self._quality_wrapper)
         workflow.add_node("match", self._matching_wrapper)
+        workflow.add_node("outreach", self._outreach_wrapper)  # NEW: Email outreach node
         workflow.add_node("store", self._storage_wrapper)
 
         # Set single entry point
@@ -104,64 +108,174 @@ class UnifiedOrchestrator:
         workflow.add_edge("deduplicate", "enrich")     # Then enrich with company data
         workflow.add_edge("enrich", "quality_check")   # Quality check enriched jobs
         workflow.add_edge("quality_check", "match")    # Match with candidates
-        workflow.add_edge("match", "store")            # Store everything
+        workflow.add_edge("match", "outreach")         # Send outreach emails
+        workflow.add_edge("outreach", "store")         # Store everything
         workflow.add_edge("store", END)
         
         return workflow.compile()
 
+    async def _run_workflow_with_retry(self, initial_state: UnifiedRecruitmentState, max_retries: int = 2) -> UnifiedRecruitmentState:
+        """Run workflow with retry logic for critical failures"""
+        last_error = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                logger.info(f"Workflow attempt {attempt + 1}/{max_retries + 1}")
+                logger.info(f"DEBUG: About to invoke graph with state keys: {list(initial_state.keys())}")
+
+                # Run the workflow
+                logger.info("DEBUG: About to invoke LangGraph")
+                final_state = await self.graph.ainvoke(initial_state)
+                logger.info("DEBUG: LangGraph execution completed")
+
+                logger.info(f"DEBUG: Graph execution completed. Final state keys: {list(final_state.keys())}")
+
+                # Check for critical failures
+                errors = final_state.get("errors", [])
+                critical_errors = [err for err in errors if any(critical in err.lower() for critical in
+                                 ["database", "connection", "timeout", "authentication"])]
+
+                if critical_errors and attempt < max_retries:
+                    logger.warning(f"Critical errors detected, retrying: {critical_errors}")
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+
+                # Success or final attempt
+                if attempt > 0:
+                    logger.info(f"Workflow succeeded on attempt {attempt + 1}")
+
+                return final_state  # type: ignore
+
+            except Exception as e:
+                last_error = e
+                logger.error(f"Workflow attempt {attempt + 1} failed: {e}")
+
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt
+                    logger.info(f"⏳ Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"All workflow attempts failed. Last error: {e}")
+                    # Return a minimal state with error information
+                    error_state = dict(initial_state)
+                    error_state["errors"] = initial_state.get("errors", []) + [f"Workflow failed: {str(e)}"]
+                    error_state["completed_at"] = datetime.now(timezone.utc).isoformat()
+                    return error_state  # type: ignore
+
+        # This should never be reached, but just in case
+        raise last_error or Exception("Unknown workflow error")
+
+    async def _run_node_with_error_handling(self, node_name: str, node_func, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
+        """Run a workflow node with comprehensive error handling"""
+        try:
+            logger.info(f"Starting {node_name}")
+            start_time = datetime.now()
+
+            # Run the node
+            result = await node_func(dict(state))
+
+            # Calculate processing time
+            processing_time = (datetime.now() - start_time).total_seconds()
+            logger.info(f"{node_name} completed in {processing_time:.2f}s")
+
+            # Update state with results
+            for key, value in result.items():
+                if key in state:
+                    state[key] = value
+
+            return state
+
+        except Exception as e:
+            logger.error(f"{node_name} failed: {e}")
+
+            # Add error to state
+            if "errors" not in state:
+                state["errors"] = []
+            state["errors"].append(f"{node_name}: {str(e)}")
+
+            # For critical nodes, we might want to stop the workflow
+            critical_nodes = ["storage", "database"]
+            if any(critical in node_name.lower() for critical in critical_nodes):
+                logger.error(f"🚨 Critical node {node_name} failed, workflow may be compromised")
+
+            return state
+
     # Initialization Node
     async def _init_node(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Initialize the workflow state"""
-        logger.info("🚀 Starting unified recruitment workflow")
-        logger.info(f"🔍 Keywords: {state['keywords']}")
+        logger.info("Starting unified recruitment workflow")
+        logger.info(f"Keywords: {state['keywords']}")
         return state
 
-    # Scraping Nodes (Parallel)
+    # Scraping Nodes (Parallel) with Enhanced Error Handling
     async def _linkedin_node(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """LinkedIn scraping agent"""
+        """LinkedIn scraping agent with enhanced error handling"""
         try:
             logger.info("🔍 Running LinkedIn agent...")
+            start_time = datetime.now()
+
             jobs = await fetch_linkedin_jobs(state["keywords"])
+
+            processing_time = (datetime.now() - start_time).total_seconds()
             state["linkedin_jobs"] = jobs
-            logger.info(f"✅ LinkedIn: {len(jobs)} jobs found")
+            logger.info(f"LinkedIn: {len(jobs)} jobs found in {processing_time:.2f}s")
+
         except Exception as e:
-            logger.error(f"❌ LinkedIn agent failed: {e}")
+            logger.error(f"LinkedIn agent failed: {e}")
             state["linkedin_jobs"] = []
-            state["errors"].append(f"LinkedIn: {str(e)}")
+            if "errors" not in state:
+                state["errors"] = []
+            state["errors"].append(f"LinkedIn scraping: {str(e)}")
         return state
     
     async def _indeed_node(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """Indeed scraping agent"""
+        """Indeed scraping agent with enhanced error handling"""
         try:
             logger.info("🔍 Running Indeed agent...")
+            start_time = datetime.now()
+
             jobs = await fetch_indeed_jobs(state["keywords"])
+
+            processing_time = (datetime.now() - start_time).total_seconds()
             state["indeed_jobs"] = jobs
-            logger.info(f"✅ Indeed: {len(jobs)} jobs found")
+            logger.info(f"Indeed: {len(jobs)} jobs found in {processing_time:.2f}s")
+
         except Exception as e:
-            logger.error(f"❌ Indeed agent failed: {e}")
+            logger.error(f"Indeed agent failed: {e}")
             state["indeed_jobs"] = []
-            state["errors"].append(f"Indeed: {str(e)}")
+            if "errors" not in state:
+                state["errors"] = []
+            state["errors"].append(f"Indeed scraping: {str(e)}")
         return state
     
     async def _google_node(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """Google Jobs scraping agent"""
+        """Google Jobs scraping agent with enhanced error handling"""
         try:
             logger.info("🔍 Running Google agent...")
+            start_time = datetime.now()
+
             jobs = await fetch_google_jobs(state["keywords"])
+
+            processing_time = (datetime.now() - start_time).total_seconds()
             state["google_jobs"] = jobs
-            logger.info(f"✅ Google: {len(jobs)} jobs found")
+            logger.info(f"Google: {len(jobs)} jobs found in {processing_time:.2f}s")
+
         except Exception as e:
-            logger.error(f"❌ Google agent failed: {e}")
+            logger.error(f"Google agent failed: {e}")
             state["google_jobs"] = []
-            state["errors"].append(f"Google: {str(e)}")
+            if "errors" not in state:
+                state["errors"] = []
+            state["errors"].append(f"Google scraping: {str(e)}")
         return state
     
     # Aggregation Node
     async def _aggregate_node(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Aggregate all scraping results"""
         try:
-            logger.info("📊 Aggregating scraping results...")
-            
+            logger.info("DEBUG: AGGREGATE NODE CALLED!")
+            logger.info("Aggregating scraping results...")
+            logger.info(f"State keys before aggregation: {list(state.keys())}")
+
             # Combine all jobs
             all_jobs = []
             
@@ -189,69 +303,120 @@ class UnifiedOrchestrator:
                 "processing_time_seconds": 0
             }
             
-            logger.info(f"📊 Aggregated {len(all_jobs)} total jobs")
-            
+            logger.info(f"Aggregated {len(all_jobs)} total jobs")
+
         except Exception as e:
-            logger.error(f"❌ Aggregation failed: {e}")
+            logger.error(f"Aggregation failed: {e}")
             state["raw_jobs"] = []
             state["errors"].append(f"Aggregation: {str(e)}")
         
         return state
-    
-    # Processing Node Wrappers (Sequential)
-    async def _deduplication_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """Wrapper for deduplication node"""
-        logger.info("🔄 Step 2: Deduplication")
-        result = await deduplication_node(dict(state))
-        for key, value in result.items():
-            if key in state:
-                state[key] = value
+
+    # Email Outreach Node
+    async def _outreach_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Send outreach emails to hiring managers for matched jobs"""
+        try:
+            logger.info("Starting email outreach...")
+
+            # Get matched jobs from state
+            matched_jobs = state.get("matched_jobs", [])
+            if not matched_jobs:
+                logger.info("No matched jobs for outreach")
+                state["outreach_results"] = {"emails_sent": 0, "emails_failed": 0}
+                return state
+
+            # Skip contacts loading - using direct email configuration
+            # Contacts functionality kept in code but not used in workflow
+            demo_contact = {"email": "abhijeet.kr.chaurasiya@gmail.com", "name": "Demo Contact"}
+            emails_sent = 0
+            emails_failed = 0
+
+            # Send outreach email for each matched job (limit to 3 for demo)
+            for job in matched_jobs[:3]:  # Limit to first 3 jobs for demo
+                try:
+                    # Get job details
+                    job_title = job.get("title", "Position")
+                    company_name = job.get("company", "Company")
+
+                    # Get matched candidates for this job
+                    candidates = job.get("matched_candidates", [])
+                    if not candidates:
+                        continue
+
+                    # Send professional outreach email
+                    result = await send_professional_outreach_email(
+                        recruiter_email=demo_contact["email"],
+                        job_title=job_title,
+                        company_name=company_name,
+                        company_achievement="Growing tech company",  # Demo data
+                        candidates=candidates[:2],  # Top 2 candidates
+                        subject=f"Top Candidates for {job_title} Position"
+                    )
+
+                    if result.get("success", False):
+                        emails_sent += 1
+                        logger.info(f"Outreach email sent for {job_title} at {company_name}")
+                    else:
+                        emails_failed += 1
+                        logger.error(f"Failed to send outreach email for {job_title}")
+
+                except Exception as e:
+                    emails_failed += 1
+                    logger.error(f"Error sending outreach email: {e}")
+
+            # Store results
+            state["outreach_results"] = {
+                "emails_sent": emails_sent,
+                "emails_failed": emails_failed,
+                "contact_used": demo_contact["email"],
+                "jobs_processed": len(matched_jobs[:3])
+            }
+
+            logger.info(f"Outreach completed: {emails_sent} sent, {emails_failed} failed")
+
+        except Exception as e:
+            logger.error(f"Outreach node failed: {e}")
+            state["outreach_results"] = {"emails_sent": 0, "emails_failed": 0, "error": str(e)}
+            state["errors"].append(f"Outreach: {str(e)}")
+
         return state
+
+    # Processing Node Wrappers (Sequential) with Enhanced Error Handling
+    async def _deduplication_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
+        """Wrapper for deduplication node with error handling"""
+        return await self._run_node_with_error_handling("Deduplication", deduplication_node, state)
 
     async def _enrichment_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """Wrapper for enrichment node"""
-        logger.info("🔄 Step 3: Enrichment")
-        result = await enrichment_node(dict(state))
-        for key, value in result.items():
-            if key in state:
-                state[key] = value
-        return state
+        """Wrapper for enrichment node with error handling"""
+        return await self._run_node_with_error_handling("Enrichment", enrichment_node, state)
 
     async def _parsing_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """Wrapper for parsing node"""
-        logger.info("🔄 Step 4: Parsing")
-        result = await parsing_node(dict(state))
-        for key, value in result.items():
-            if key in state:
-                state[key] = value
-        return state
+        """Wrapper for parsing node with error handling"""
+        logger.info("DEBUG: PARSING WRAPPER CALLED!")
+        logger.info(f"State keys in parsing wrapper: {list(state.keys())}")
+        logger.info(f"Raw jobs count: {len(state.get('raw_jobs', []))}")
+        return await self._run_node_with_error_handling("Parsing", parsing_node, state)
 
     async def _quality_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """Wrapper for quality check node"""
-        logger.info("🔄 Step 5: Quality Check")
-        result = await quality_check_node(dict(state))
-        for key, value in result.items():
-            if key in state:
-                state[key] = value
-        return state
-    
+        """Wrapper for quality check node with error handling"""
+        return await self._run_node_with_error_handling("Quality Check", quality_check_node, state)
+
     async def _matching_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """Wrapper for matching node"""
-        logger.info("🔄 Step 6: Matching")
-        result = await matching_node(dict(state))
+        """Wrapper for matching node with error handling"""
+        return await self._run_node_with_error_handling("Matching", matching_node, state)
+
+    async def _outreach_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
+        """Wrapper for email outreach node"""
+        logger.info("Step 7: Email Outreach")
+        result = await self._outreach_node(dict(state))
         for key, value in result.items():
             if key in state:
                 state[key] = value
         return state
 
     async def _storage_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """Wrapper for storage node"""
-        logger.info("🔄 Step 7: Storage")
-        result = await storage_node(dict(state))
-        for key, value in result.items():
-            if key in state:
-                state[key] = value
-        return state
+        """Wrapper for storage node with error handling"""
+        return await self._run_node_with_error_handling("Storage", storage_node, state)
     
     def _get_candidate_title(self, match: dict) -> str:
         """Generate professional title for candidate based on match data"""
@@ -332,6 +497,7 @@ class UnifiedOrchestrator:
                 "parsed_jobs": [],
                 "quality_checked_jobs": [],
                 "matched_jobs": [],
+                "outreach_results": {},
                 "stored_jobs": [],
                 "workflow_id": workflow_id,
                 "current_step": "starting",
@@ -348,10 +514,13 @@ class UnifiedOrchestrator:
                 }
             }
 
-            logger.info(f"🚀 Starting unified workflow with keywords: '{initial_state['keywords']}'")
+            logger.info(f"Starting unified workflow with keywords: '{initial_state['keywords']}'")
+            logger.info(f"DEBUG: WORKFLOW FUNCTION CALLED! About to run graph...")
 
-            # Run the complete graph
-            final_state = await self.graph.ainvoke(initial_state)
+            # Run the complete graph with error handling and retry logic
+            final_state = await self._run_workflow_with_retry(initial_state)
+
+            logger.info(f"DEBUG: WORKFLOW COMPLETED! Final state keys: {list(final_state.keys())}")
 
             # Calculate processing time
             end_time = datetime.now(timezone.utc)
@@ -367,7 +536,7 @@ class UnifiedOrchestrator:
             
             # Log final results
             stats = final_state.get("stats", {})
-            logger.info(f"🎯 Unified workflow completed:")
+            logger.info(f"Unified workflow completed:")
             logger.info(f"   Jobs discovered: {stats.get('total_jobs_discovered', 0)}")
             logger.info(f"   Jobs stored: {len(final_state.get('stored_jobs', []))}")
             logger.info(f"   Matches found: {len(final_state.get('matched_jobs', []))}")
@@ -375,7 +544,7 @@ class UnifiedOrchestrator:
             # --- OUTREACH (FINAL STEP) ---
             try:
                 # ALWAYS send email to abhijeet.kr.chaurasiya@gmail.com regardless of conditions
-                logger.info("📧 Preparing to send workflow summary email to abhijeet.kr.chaurasiya@gmail.com")
+                logger.info("Preparing to send workflow summary email to abhijeet.kr.chaurasiya@gmail.com")
                 
                 # Get matched jobs with candidates for outreach
                 matched_jobs = final_state.get("matched_jobs", [])
@@ -485,10 +654,10 @@ class UnifiedOrchestrator:
                     summary_body = f"""
                     <html>
                     <body>
-                    <h2>🤖 AI Recruitment Workflow Summary</h2>
+                    <h2>AI Recruitment Workflow Summary</h2>
                     <p><strong>Execution Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
                     
-                    <h3>📊 Workflow Statistics</h3>
+                    <h3>Workflow Statistics</h3>
                     <ul>
                         <li><strong>Jobs Discovered:</strong> {stats.get('total_jobs_discovered', 0)}</li>
                         <li><strong>Jobs Stored:</strong> {total_jobs}</li>
@@ -498,13 +667,13 @@ class UnifiedOrchestrator:
                         <li><strong>Failed Emails:</strong> {outreach_summary.get('failed_emails', 0)}</li>
                     </ul>
                     
-                    <h3>⚙️ Configuration Status</h3>
+                    <h3>Configuration Status</h3>
                     <ul>
                         <li><strong>Outreach Enabled:</strong> {outreach_enabled}</li>
-                        <li><strong>Email Service:</strong> {'✅ Active' if os.getenv('EMAIL_USERNAME') and os.getenv('EMAIL_PASSWORD') else '❌ Not Configured'}</li>
+                        <li><strong>Email Service:</strong> {'Active' if os.getenv('EMAIL_USERNAME') and os.getenv('EMAIL_PASSWORD') else 'Not Configured'}</li>
                     </ul>
                     
-                    <h3>🔍 Recent Job Matches</h3>
+                    <h3>Recent Job Matches</h3>
                     """
                     
                     # Add details about recent matches
@@ -531,8 +700,8 @@ class UnifiedOrchestrator:
                     
                     # Send summary email
                     summary_result = send_sync_email(
-                        to_email="abhijeet.kr.chaurasiya@gmail.com",
                         subject=summary_subject,
+                        recipient="abhijeet.kr.chaurasiya@gmail.com",
                         body=summary_body
                     )
                     
@@ -559,7 +728,7 @@ class UnifiedOrchestrator:
                     error_body = f"""
                     <html>
                     <body>
-                    <h2>⚠️ AI Recruitment Workflow Error</h2>
+                    <h2>AI Recruitment Workflow Error</h2>
                     <p><strong>Execution Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
                     <p><strong>Error:</strong> {str(outreach_err)}</p>
                     <p><em>Please check the system logs for more details.</em></p>
@@ -568,8 +737,8 @@ class UnifiedOrchestrator:
                     """
                     
                     send_sync_email(
-                        to_email="abhijeet.kr.chaurasiya@gmail.com",
                         subject=error_subject,
+                        recipient="abhijeet.kr.chaurasiya@gmail.com",
                         body=error_body
                     )
                     logger.info("📧 Error notification email sent to abhijeet.kr.chaurasiya@gmail.com")
@@ -589,7 +758,7 @@ class UnifiedOrchestrator:
             }
             
         except Exception as e:
-            logger.error(f"❌ Unified workflow failed: {e}")
+            logger.error(f"Unified workflow failed: {e}")
             return {
                 "success": False,
                 "error": str(e),
