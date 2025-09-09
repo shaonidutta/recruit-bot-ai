@@ -12,25 +12,22 @@ logger = logging.getLogger(__name__)
 
 async def storage_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Store jobs and matches to database with comprehensive error handling"""
-    logger.info("DEBUG: STORAGE NODE CALLED!")
     logger.info("Starting enhanced storage with error handling")
     logger.info(f"State keys in storage: {list(state.keys())}")
 
-    # Store ALL enriched jobs (not just matched ones)
+    # Store matched jobs (which contain the match data)
+    matched_jobs = state.get("matched_jobs", [])
     enriched_jobs = state.get("enriched_jobs", [])
-    logger.info(f"Enriched jobs count: {len(enriched_jobs)}")
+
+    # Use matched_jobs if available (contains match data), otherwise fall back to enriched_jobs
+    jobs_to_store = matched_jobs if matched_jobs else enriched_jobs
+
+    logger.info(f"Jobs to store: {len(jobs_to_store)} ({'matched_jobs' if matched_jobs else 'enriched_jobs'})")
 
     # Debug: Check what data we're about to store
-    if enriched_jobs:
-        sample_job = enriched_jobs[0]
-        logger.info(f"STORAGE DEBUG: Sample job data:")
-        logger.info(f"   Title: {sample_job.get('title', 'Unknown')}")
-        logger.info(f"   Processing Status: {sample_job.get('processing_status', 'Unknown')}")
-        logger.info(f"   Job Type: {sample_job.get('job_type', 'None')}")
-        logger.info(f"   Requirements: {len(sample_job.get('requirements', []))} items")
-        logger.info(f"   Enrichment Status: {sample_job.get('enrichment_status', 'None')}")
-
-    jobs_to_store = enriched_jobs
+    if jobs_to_store:
+        sample_job = jobs_to_store[0]
+        logger.info(f"Sample job: {sample_job.get('title', 'Unknown')} with {len(sample_job.get('matches', []))} matches")
 
     if not jobs_to_store:
         state["stored_jobs"] = []
@@ -135,6 +132,11 @@ async def storage_node(state: Dict[str, Any]) -> Dict[str, Any]:
             matches = job.get("matches", [])
             matches_stored = 0
             matches_failed = 0
+
+            # DEBUG: Log match data for this job
+            logger.info(f"🔍 DEBUG STORAGE: Job '{job.get('title')}' has {len(matches)} matches to store")
+            if matches:
+                logger.info(f"🔍 DEBUG STORAGE: First match data: {matches[0]}")
 
             for match in matches:
                 try:

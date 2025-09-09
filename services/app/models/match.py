@@ -110,3 +110,10 @@ class MatchService:
             matches.append(MatchInDB(**match_doc))
         
         return matches
+
+    @classmethod
+    async def count_matches(cls, active_only: bool = True) -> int:
+        """Count total matches"""
+        collection = cls.get_collection()
+        filter_query = {"is_active": True} if active_only else {}
+        return await collection.count_documents(filter_query)

@@ -168,11 +168,17 @@ class UnifiedOrchestrator:
     async def _run_node_with_error_handling(self, node_name: str, node_func, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Run a workflow node with comprehensive error handling"""
         try:
+            print(f"🔧 DEBUG: About to run {node_name} node")
             logger.info(f"Starting {node_name}")
+            logger.info(f"🔧 DEBUG: About to run {node_name} node")
             start_time = datetime.now()
 
             # Run the node
+            print(f"🔧 DEBUG: Calling {node_name} function: {node_func}")
+            logger.info(f"🔧 DEBUG: Calling {node_name} function: {node_func}")
             result = await node_func(dict(state))
+            print(f"🔧 DEBUG: {node_name} function returned: {type(result)}")
+            logger.info(f"🔧 DEBUG: {node_name} function returned: {type(result)}")
 
             # Calculate processing time
             processing_time = (datetime.now() - start_time).total_seconds()
@@ -186,7 +192,9 @@ class UnifiedOrchestrator:
             return state
 
         except Exception as e:
+            print(f"🚨 ERROR in {node_name}: {e}")
             logger.error(f"{node_name} failed: {e}")
+            logger.error(f"🚨 FULL ERROR TRACEBACK for {node_name}:", exc_info=True)
 
             # Add error to state
             if "errors" not in state:
@@ -399,11 +407,31 @@ class UnifiedOrchestrator:
 
     async def _quality_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Wrapper for quality check node with error handling"""
-        return await self._run_node_with_error_handling("Quality Check", quality_check_node, state)
+        logger.info("🚨 QUALITY CHECK WRAPPER CALLED - DEBUG")
+        logger.info(f"🔍 State keys in quality wrapper: {list(state.keys())}")
+        result = await self._run_node_with_error_handling("Quality Check", quality_check_node, state)
+        logger.info("🚨 QUALITY CHECK WRAPPER COMPLETED - DEBUG")
+        return result
 
     async def _matching_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Wrapper for matching node with error handling"""
-        return await self._run_node_with_error_handling("Matching", matching_node, state)
+        print("🚨 MATCHING WRAPPER CALLED - DEBUG")
+        logger.info("🚨 MATCHING WRAPPER CALLED - DEBUG")
+        logger.info(f"🔍 State keys in matching wrapper: {list(state.keys())}")
+        print(f"🔍 State keys in matching wrapper: {list(state.keys())}")
+
+        # DEBUG: Check quality_checked_jobs data
+        quality_jobs = state.get('quality_checked_jobs', [])
+        print(f"🔍 Quality checked jobs count: {len(quality_jobs)}")
+        logger.info(f"🔍 Quality checked jobs count: {len(quality_jobs)}")
+        if quality_jobs:
+            print(f"🔍 First quality job: {quality_jobs[0].get('title', 'No title')}")
+            logger.info(f"🔍 First quality job: {quality_jobs[0].get('title', 'No title')}")
+
+        result = await self._run_node_with_error_handling("Matching", matching_node, state)
+        print("🚨 MATCHING WRAPPER COMPLETED - DEBUG")
+        logger.info("🚨 MATCHING WRAPPER COMPLETED - DEBUG")
+        return result
 
     async def _outreach_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Wrapper for email outreach node"""
@@ -416,7 +444,12 @@ class UnifiedOrchestrator:
 
     async def _storage_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Wrapper for storage node with error handling"""
-        return await self._run_node_with_error_handling("Storage", storage_node, state)
+        print("🚨 STORAGE WRAPPER CALLED - DEBUG")
+        logger.info("🚨 STORAGE WRAPPER CALLED - DEBUG")
+        result = await self._run_node_with_error_handling("Storage", storage_node, state)
+        print("🚨 STORAGE WRAPPER COMPLETED - DEBUG")
+        logger.info("🚨 STORAGE WRAPPER COMPLETED - DEBUG")
+        return result
     
     def _get_candidate_title(self, match: dict) -> str:
         """Generate professional title for candidate based on match data"""
@@ -481,6 +514,11 @@ class UnifiedOrchestrator:
     async def run_complete_workflow(self, keywords: str = "Software Engineer") -> Dict[str, Any]:
         """Run the complete recruitment workflow"""
         try:
+            # Ensure database connection is established
+            from ..config.database import connect_to_mongo
+            await connect_to_mongo()
+            logger.info("✅ Database connection established for workflow")
+
             # Track start time and generate workflow ID
             start_time = datetime.now(timezone.utc)
             workflow_id = f"unified_{start_time.strftime('%Y%m%d_%H%M%S')}"
@@ -514,11 +552,19 @@ class UnifiedOrchestrator:
                 }
             }
 
+            print(f"🚨 STARTING UNIFIED WORKFLOW - DEBUG")
+            print(f"Starting unified workflow with keywords: '{initial_state['keywords']}'")
+            print(f"DEBUG: WORKFLOW FUNCTION CALLED! About to run graph...")
+            logger.info(f"🚨 STARTING UNIFIED WORKFLOW - DEBUG")
             logger.info(f"Starting unified workflow with keywords: '{initial_state['keywords']}'")
             logger.info(f"DEBUG: WORKFLOW FUNCTION CALLED! About to run graph...")
 
             # Run the complete graph with error handling and retry logic
+            print(f"🚨 ABOUT TO CALL _run_workflow_with_retry - DEBUG")
+            logger.info(f"🚨 ABOUT TO CALL _run_workflow_with_retry - DEBUG")
             final_state = await self._run_workflow_with_retry(initial_state)
+            print(f"🚨 _run_workflow_with_retry COMPLETED - DEBUG")
+            logger.info(f"🚨 _run_workflow_with_retry COMPLETED - DEBUG")
 
             logger.info(f"DEBUG: WORKFLOW COMPLETED! Final state keys: {list(final_state.keys())}")
 

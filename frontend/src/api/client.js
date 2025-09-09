@@ -7,7 +7,7 @@ const API_BASE_URL = String(RAW_BASE).replace(/\/$/, '');
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 60000, // Increased to 60 seconds for workflow operations
   headers: {
     'Content-Type': 'application/json',
   },

@@ -57,11 +57,17 @@ export const AuthProvider = ({ children }) => {
       const data = await authService.login(email, password);
 
       // After successful login, fetch fresh user data from auth/me
-      const freshUserData = await authService.verifyToken();
-      if (freshUserData) {
-        dispatch({ type: 'LOGIN_SUCCESS', payload: freshUserData });
-        return freshUserData;
-      } else {
+      try {
+        const freshUserData = await authService.verifyToken();
+        if (freshUserData) {
+          dispatch({ type: 'LOGIN_SUCCESS', payload: freshUserData });
+          return freshUserData;
+        } else {
+          dispatch({ type: 'LOGIN_SUCCESS', payload: data });
+          return data;
+        }
+      } catch (verifyError) {
+        // If token verification fails, still use the login data
         dispatch({ type: 'LOGIN_SUCCESS', payload: data });
         return data;
       }

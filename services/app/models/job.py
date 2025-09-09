@@ -47,6 +47,7 @@ class JobBase(BaseModel):
     experience_years: Optional[int] = None
     company_id: Optional[str] = None  # Reference to Company document (NEW)
     company_data: Optional[dict] = None  # Enriched company information (DEPRECATED - use company_id)
+    parsed_data: Optional[dict] = None   # Parsed job data
     via: Optional[str] = None            # Source platform (from scraping)
     raw_data: Optional[dict] = None      # Original scraped data
     processing_status: Optional[str] = "discovered"  # discovered, enriched, parsed, matched
@@ -92,6 +93,7 @@ class JobUpdate(BaseModel):
     experience_years: Optional[int] = None
     company_id: Optional[str] = None  # Reference to Company document (NEW)
     company_data: Optional[dict] = None
+    parsed_data: Optional[dict] = None  # Parsed job data
     via: Optional[str] = None
     raw_data: Optional[dict] = None
     processing_status: Optional[str] = None
