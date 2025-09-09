@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
+import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import { analyticsService } from '../../../api/services/analyticsService';
 import {
   LineChart,
   Line,
@@ -30,57 +32,48 @@ const DashboardAnalytics = () => {
     workflowSuccess: [],
     emailPerformance: []
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Generate mock analytics data
+  // Fetch real analytics data
   useEffect(() => {
-    const generateMockData = () => {
-      // Job discovery trends (last 7 days)
-      const jobTrends = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (6 - i));
-        return {
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          jobs: Math.floor(Math.random() * 50) + 20,
-          matches: Math.floor(Math.random() * 15) + 5,
-          emails: Math.floor(Math.random() * 25) + 10
-        };
-      });
+    const fetchAnalyticsData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      // Job source breakdown
-      const sourceBreakdown = [
-        { name: 'LinkedIn', value: 45, color: '#0077B5' },
-        { name: 'Indeed', value: 35, color: '#2557A7' },
-        { name: 'Google Jobs', value: 20, color: '#4285F4' }
-      ];
+        const response = await analyticsService.getDashboardAnalytics(7);
 
-      // Workflow success rates
-      const workflowSuccess = [
-        { name: 'Job Discovery', success: 95, failed: 5 },
-        { name: 'Candidate Matching', success: 87, failed: 13 },
-        { name: 'Email Delivery', success: 92, failed: 8 },
-        { name: 'Response Rate', success: 15, failed: 85 }
-      ];
+        if (response.success) {
+          setAnalyticsData({
+            jobTrends: response.data.job_trends || [],
+            sourceBreakdown: response.data.source_breakdown || []
+          });
+        } else {
+          throw new Error(response.message || 'Failed to fetch analytics data');
+        }
+      } catch (err) {
+        console.error('Error fetching analytics:', err);
+        setError(err.message);
 
-      // Email performance metrics
-      const emailPerformance = [
-        { metric: 'Sent', value: 156, color: '#3B82F6' },
-        { metric: 'Delivered', value: 143, color: '#10B981' },
-        { metric: 'Opened', value: 67, color: '#F59E0B' },
-        { metric: 'Replied', value: 23, color: '#8B5CF6' }
-      ];
-
-      setAnalyticsData({
-        jobTrends,
-        sourceBreakdown,
-        workflowSuccess,
-        emailPerformance
-      });
+        // Fallback to minimal mock data on error
+        setAnalyticsData({
+          jobTrends: [],
+          sourceBreakdown: [
+            { name: 'LinkedIn', value: 50, color: '#0077B5' },
+            { name: 'Indeed', value: 30, color: '#2557A7' },
+            { name: 'Google Jobs', value: 20, color: '#4285F4' }
+          ]
+        });
+      } finally {
+        setLoading(false);
+      }
     };
 
-    generateMockData();
-    
-    // Update data every 30 seconds for demo effect
-    const interval = setInterval(generateMockData, 30000);
+    fetchAnalyticsData();
+
+    // Refresh data every 60 seconds
+    const interval = setInterval(fetchAnalyticsData, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -100,15 +93,55 @@ const DashboardAnalytics = () => {
     return null;
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="lg:col-span-2">
+          <CardContent className="flex items-center justify-center py-12">
+            <LoadingSpinner />
+            <span className="ml-2 text-gray-600">Loading analytics data...</span>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="lg:col-span-2">
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="text-red-600 mb-2">⚠️ Error loading analytics</div>
+              <div className="text-sm text-gray-600">{error}</div>
+              <div className="text-xs text-gray-500 mt-2">Showing fallback data</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Job Discovery Trends */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <span>📈</span>
-            <span>Job Discovery Trends</span>
-            <Badge variant="outline" className="ml-auto">Last 7 days</Badge>
+      <Card className="lg:col-span-2 bg-gradient-to-br from-white to-blue-50 border-0 shadow-xl">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-green-500 to-purple-500" />
+        <CardHeader className="relative">
+          <CardTitle className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center shadow-lg">
+              <span className="text-white text-lg">📈</span>
+            </div>
+            <div>
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+                Job Discovery Trends
+              </span>
+              <Badge variant="outline" className="ml-3 bg-blue-50 text-blue-700 border-blue-200">
+                Last 7 days {loading && '(Updating...)'}
+              </Badge>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -158,11 +191,16 @@ const DashboardAnalytics = () => {
       </Card>
 
       {/* Job Source Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <span>🎯</span>
-            <span>Job Sources</span>
+      <Card className="bg-gradient-to-br from-white to-purple-50 border-0 shadow-xl">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
+        <CardHeader className="relative">
+          <CardTitle className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg">
+              <span className="text-white text-lg">🎯</span>
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              Job Sources
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -195,76 +233,8 @@ const DashboardAnalytics = () => {
         </CardContent>
       </Card>
 
-      {/* Workflow Success Rates */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <span>✅</span>
-            <span>Success Rates</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={analyticsData.workflowSuccess} layout="horizontal">
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis type="number" domain={[0, 100]} stroke="#6B7280" />
-              <YAxis dataKey="name" type="category" width={100} stroke="#6B7280" />
-              <Tooltip 
-                formatter={(value, name) => [`${value}%`, name === 'success' ? 'Success' : 'Failed']}
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '8px'
-                }}
-              />
-              <Bar dataKey="success" stackId="a" fill="#10B981" />
-              <Bar dataKey="failed" stackId="a" fill="#EF4444" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
 
-      {/* Email Performance */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <span>📧</span>
-            <span>Email Campaign Performance</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={analyticsData.emailPerformance}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="metric" stroke="#6B7280" />
-              <YAxis stroke="#6B7280" />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]}>
-                {analyticsData.emailPerformance.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          
-          {/* Email funnel metrics */}
-          <div className="grid grid-cols-4 gap-4 mt-4">
-            {analyticsData.emailPerformance.map((metric, index) => (
-              <div key={metric.metric} className="text-center">
-                <div className="text-2xl font-bold" style={{ color: metric.color }}>
-                  {metric.value}
-                </div>
-                <div className="text-sm text-gray-600">{metric.metric}</div>
-                {index > 0 && (
-                  <div className="text-xs text-gray-500 mt-1">
-                    {((metric.value / analyticsData.emailPerformance[0].value) * 100).toFixed(1)}%
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+
     </div>
   );
 };

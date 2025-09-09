@@ -37,7 +37,7 @@ async def scrape_indeed_jobs(job_title: str) -> List[Dict]:
                 "location": job.get("location"),
                 "description": job.get("description"),
                 "via": job.get("via"),
-                "discovered_from": "indeed"
+                "source": "indeed"
             })
 
     print(f"✅ Found {len(jobs)} Indeed jobs.")
@@ -70,7 +70,7 @@ async def scrape_linkedin_jobs(job_title: str) -> List[Dict]:
                 "location": job.get("location"),
                 "description": job.get("description"),
                 "via": job.get("via"),
-                "discovered_from": "linkedin"
+                "source": "linkedin"
             })
 
     print(f"✅ Found {len(jobs)} LinkedIn jobs.")
@@ -105,7 +105,7 @@ async def scrape_google_jobs(job_title: str) -> List[Dict]:
                 "location": job.get("location"),
                 "description": job.get("description"),
                 "via": job.get("via"),
-                "discovered_from": "google"
+                "source": "google"
             })
 
     print(f"✅ Found {len(jobs)} Google jobs.")

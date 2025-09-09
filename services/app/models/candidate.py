@@ -17,9 +17,16 @@ class PyObjectId(ObjectId):
 
     @classmethod
     def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid objectid")
-        return ObjectId(v)
+        # Handle both ObjectId and string IDs
+        if isinstance(v, ObjectId):
+            return v
+        if isinstance(v, str):
+            # If it's a valid ObjectId string, convert it
+            if ObjectId.is_valid(v):
+                return ObjectId(v)
+            # Otherwise, keep it as a string (for new candidate IDs like "candidate_001")
+            return v
+        raise ValueError("Invalid objectid")
 
     @classmethod
     def __get_pydantic_json_schema__(cls, field_schema, handler):
@@ -137,18 +144,28 @@ class CandidateService:
     
     @classmethod
     async def find_by_id(cls, candidate_id: str) -> Optional[CandidateInDB]:
-        """Find candidate by ID"""
+        """Find candidate by ID - handles both ObjectId and string IDs"""
         collection = cls.get_collection()
-        
+
+        # First try as ObjectId (for legacy candidates)
         try:
             object_id = ObjectId(candidate_id)
             candidate_doc = await collection.find_one({"_id": object_id})
-            
+
             if candidate_doc:
                 return CandidateInDB(**candidate_doc)
         except Exception:
             pass
-        
+
+        # Then try as string ID (for new candidates)
+        try:
+            candidate_doc = await collection.find_one({"_id": candidate_id})
+
+            if candidate_doc:
+                return CandidateInDB(**candidate_doc)
+        except Exception:
+            pass
+
         return None
     
     @classmethod
@@ -194,26 +211,39 @@ class CandidateService:
     
     @classmethod
     async def update_candidate(cls, candidate_id: str, update_data: CandidateUpdate) -> Optional[CandidateInDB]:
-        """Update candidate"""
+        """Update candidate - handles both ObjectId and string IDs"""
         collection = cls.get_collection()
-        
-        try:
-            object_id = ObjectId(candidate_id)
-            
-            # Prepare update data
-            update_dict = {k: v for k, v in update_data.dict(exclude_unset=True).items() if v is not None}
-            
-            if update_dict:
-                update_dict["updated_at"] = datetime.utcnow()
-                
-                await collection.update_one(
+
+        # Prepare update data
+        update_dict = {k: v for k, v in update_data.dict(exclude_unset=True).items() if v is not None}
+
+        if update_dict:
+            update_dict["updated_at"] = datetime.utcnow()
+
+            # Try as ObjectId first (for legacy candidates)
+            try:
+                object_id = ObjectId(candidate_id)
+                result = await collection.update_one(
                     {"_id": object_id},
                     {"$set": update_dict}
                 )
-            
-            return await cls.find_by_id(candidate_id)
-        except Exception:
-            return None
+                if result.modified_count > 0:
+                    return await cls.find_by_id(candidate_id)
+            except Exception:
+                pass
+
+            # Try as string ID (for new candidates)
+            try:
+                result = await collection.update_one(
+                    {"_id": candidate_id},
+                    {"$set": update_dict}
+                )
+                if result.modified_count > 0:
+                    return await cls.find_by_id(candidate_id)
+            except Exception:
+                pass
+
+        return None
     
     @classmethod
     async def search_candidates(cls, query: str, skills: List[str] = None, skip: int = 0, limit: int = 100) -> List[CandidateInDB]:

@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '../../utils/cn';
+import { FullLogo } from '../ui/Logo';
 
 const navigation = [
   {
@@ -40,15 +41,7 @@ const DashboardSidebar = ({ isOpen, onClose }) => {
     )}>
       {/* Logo */}
       <div className="flex items-center justify-center h-16 px-6 border-b border-slate-200">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">AI</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">Recruitment</h1>
-            <p className="text-xs text-slate-500">Agent</p>
-          </div>
-        </div>
+        <FullLogo size="md" />
       </div>
 
       {/* Navigation */}

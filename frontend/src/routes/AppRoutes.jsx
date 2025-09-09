@@ -5,6 +5,7 @@ import SignupPage from '../pages/auth/SignupPage.jsx';
 import DashboardPage from '../pages/dashboard/DashboardPage.jsx';
 import JobsPage from '../pages/jobs/JobsPage.jsx';
 import CandidatesPage from '../pages/candidates/CandidatesPage.jsx';
+import MatchTestPage from '../pages/MatchTestPage.jsx';
 import ProtectedRoute from './ProtectedRoute.jsx';
 import { ROUTES } from '../utils/constants.js';
 
@@ -34,15 +35,24 @@ const AppRoutes = () => {
         } 
       />
       
-      <Route 
-        path={ROUTES.CANDIDATES} 
+      <Route
+        path={ROUTES.CANDIDATES}
         element={
           <ProtectedRoute>
             <CandidatesPage />
           </ProtectedRoute>
-        } 
+        }
       />
-      
+
+      <Route
+        path="/match-test"
+        element={
+          <ProtectedRoute>
+            <MatchTestPage />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default redirect */}
       <Route path="/" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
       

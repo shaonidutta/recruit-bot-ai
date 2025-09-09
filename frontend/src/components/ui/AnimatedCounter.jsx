@@ -104,12 +104,12 @@ export const LiveIndicator = ({
   className = "" 
 }) => {
   const formatTimeAgo = (date) => {
-    if (!date) return 'Never';
-    
+    if (!date) return 'recently';
+
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-    
-    if (diffInSeconds < 60) return 'Just now';
+
+    if (diffInSeconds < 60) return 'just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
     return `${Math.floor(diffInSeconds / 86400)}d ago`;
@@ -136,26 +136,34 @@ export const LiveIndicator = ({
  * @param {boolean} animated - Whether to show animated stripes
  * @param {string} className - Additional CSS classes
  */
-export const ProgressBar = ({ 
-  progress, 
-  status, 
-  animated = false, 
-  className = "" 
+export const ProgressBar = ({
+  progress,
+  status,
+  animated = false,
+  className = ""
 }) => {
   return (
     <div className={`w-full ${className}`}>
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-sm font-medium text-gray-700">{status}</span>
-        <span className="text-sm text-gray-500">{Math.round(progress)}%</span>
+      <div className="flex justify-between items-center mb-3">
+        <span className="text-sm font-semibold text-gray-800">{status}</span>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm font-bold text-blue-600">{Math.round(progress)}%</span>
+          {animated && (
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+          )}
+        </div>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2">
-        <div 
-          className={`h-2 rounded-full transition-all duration-300 ${
-            animated 
-              ? 'bg-gradient-to-r from-blue-500 to-blue-600 bg-[length:20px_20px] animate-pulse' 
-              : 'bg-blue-500'
+      <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner">
+        <div
+          className={`h-3 rounded-full transition-all duration-500 ease-out ${
+            animated
+              ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-500 shadow-lg'
+              : 'bg-gradient-to-r from-blue-500 to-blue-600'
           }`}
-          style={{ width: `${Math.min(progress, 100)}%` }}
+          style={{
+            width: `${Math.min(progress, 100)}%`,
+            boxShadow: animated ? '0 0 10px rgba(59, 130, 246, 0.5)' : 'none'
+          }}
         />
       </div>
     </div>

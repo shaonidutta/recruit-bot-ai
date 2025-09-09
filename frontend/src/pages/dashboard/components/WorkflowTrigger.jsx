@@ -18,17 +18,17 @@ const WorkflowTrigger = ({ onWorkflowComplete }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [workflowStartTime, setWorkflowStartTime] = useState(null);
 
-  // Workflow progress simulation steps
+  // Workflow progress simulation steps - More realistic timing
   const progressSteps = [
-    { progress: 0, message: "🚀 Initializing AI recruitment agents...", duration: 1000 },
-    { progress: 15, message: "🔍 Scanning LinkedIn job postings...", duration: 2000 },
-    { progress: 30, message: "🎯 Scraping Indeed opportunities...", duration: 2500 },
-    { progress: 45, message: "🌐 Discovering Google job listings...", duration: 2000 },
-    { progress: 60, message: "📊 Processing and deduplicating jobs...", duration: 1500 },
-    { progress: 75, message: "🤖 Running AI matching algorithms...", duration: 2000 },
-    { progress: 85, message: "✉️ Generating personalized outreach emails...", duration: 1500 },
-    { progress: 95, message: "📧 Sending emails to hiring managers...", duration: 1000 },
-    { progress: 100, message: "✅ Workflow completed successfully!", duration: 500 }
+    { progress: 0, message: "🚀 Initializing AI recruitment agents...", duration: 3000 },
+    { progress: 10, message: "🔍 Scanning LinkedIn job postings...", duration: 8000 },
+    { progress: 25, message: "🎯 Scraping Indeed opportunities...", duration: 7000 },
+    { progress: 40, message: "🌐 Discovering Google job listings...", duration: 6000 },
+    { progress: 55, message: "📊 Processing and deduplicating jobs...", duration: 5000 },
+    { progress: 70, message: "🤖 Running AI matching algorithms...", duration: 8000 },
+    { progress: 85, message: "✉️ Generating personalized outreach emails...", duration: 6000 },
+    { progress: 95, message: "📧 Sending emails to hiring managers...", duration: 4000 },
+    { progress: 100, message: "✅ Workflow completed successfully!", duration: 2000 }
   ];
 
   const simulateProgress = () => {
@@ -147,11 +147,20 @@ const WorkflowTrigger = ({ onWorkflowComplete }) => {
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <span className="text-2xl">🤖</span>
-          Job Discovery Workflow
+    <Card className="w-full bg-gradient-to-br from-white to-blue-50 border-0 shadow-xl">
+      {/* Gradient accent bar */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-500" />
+      <CardHeader className="relative">
+        <CardTitle className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+            <span className="text-white text-xl">🤖</span>
+          </div>
+          <div>
+            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Job Discovery Workflow
+            </span>
+            <p className="text-sm text-gray-500 font-normal">AI-powered talent acquisition</p>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -194,12 +203,12 @@ const WorkflowTrigger = ({ onWorkflowComplete }) => {
 
         {/* Enhanced Progress Display */}
         {(isRunning || loading) && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6 shadow-inner">
             <ProgressBar
               progress={workflowProgress}
               status={currentStep || "Preparing workflow..."}
               animated={true}
-              className="mb-4"
+              className="mb-6"
             />
 
             {/* Live Updates Feed */}

@@ -21,7 +21,15 @@ const MetricCard = ({
   lastUpdated,
   formatter
 }) => (
-  <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-105">
+  <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 bg-gradient-to-br from-white to-gray-50 border-0 shadow-lg">
+    {/* Gradient accent bar */}
+    <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${
+      color === 'green' ? 'from-green-500 to-green-600' :
+      color === 'red' ? 'from-red-500 to-red-600' :
+      color === 'orange' ? 'from-orange-500 to-orange-600' :
+      color === 'purple' ? 'from-purple-500 to-purple-600' :
+      'from-blue-500 to-blue-600'
+    }`} />
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium text-slate-600">
         {title}

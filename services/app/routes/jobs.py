@@ -156,50 +156,8 @@ async def get_job_stats():
     except Exception as e:
         return send_error("Failed to retrieve statistics", 500)
 
-@router.get("/matches")
-async def get_matches(
-    limit: int = Query(10, ge=1, le=100),
-    skip: int = Query(0, ge=0)
-):
-    """
-    Get job-candidate matches
-    GET /api/v1/matches?limit=10&skip=0
-    """
-    try:
-        from ..models.match import MatchService
-
-        # Get matches from database
-        collection = MatchService.get_collection()
-        cursor = collection.find({"is_active": True}).sort("created_at", -1).skip(skip).limit(limit)
-
-        matches = []
-        async for match_doc in cursor:
-            matches.append({
-                "id": str(match_doc["_id"]),
-                "job_id": match_doc.get("job_id"),
-                "candidate_id": match_doc.get("candidate_id"),
-                "match_score": match_doc.get("match_score", 0.0),
-                "match_reasons": match_doc.get("match_reasons", []),
-                "created_at": match_doc.get("created_at").isoformat() if match_doc.get("created_at") else None
-            })
-
-        total_count = await collection.count_documents({"is_active": True})
-
-        return send_success(
-            data={
-                "matches": matches,
-                "pagination": {
-                    "skip": skip,
-                    "limit": limit,
-                    "total": total_count,
-                    "has_more": skip + limit < total_count
-                }
-            },
-            message="Matches retrieved successfully"
-        )
-    except Exception as e:
-        logger.error(f"Error retrieving matches: {str(e)}", exc_info=True)
-        return send_error(f"Failed to retrieve matches: {str(e)}", 500)
+# Matches endpoint moved to dedicated matches.py route file
+# This endpoint is deprecated - use /api/v1/matches instead
 
 @router.get("/recent-jobs")
 async def get_recent_jobs(

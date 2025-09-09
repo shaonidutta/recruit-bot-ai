@@ -163,9 +163,17 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
         # Convert to matching format
         candidates = []
         for candidate in db_candidates:
+            # Handle both name formats: single "name" field or "first_name" + "last_name"
+            if "name" in candidate:
+                full_name = candidate["name"]
+            else:
+                first_name = candidate.get("first_name", "")
+                last_name = candidate.get("last_name", "")
+                full_name = f"{first_name} {last_name}".strip() or "Unknown"
+
             candidates.append({
                 "id": str(candidate["_id"]),
-                "name": candidate.get("name", "Unknown"),
+                "name": full_name,
                 "email": candidate.get("email", ""),
                 "skills": candidate.get("skills", []),
                 "experience": candidate.get("experience_years", 0),  # Fixed: was "experience_years"
@@ -253,8 +261,8 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     logger.info(f"   🔧 DEBUG: Candidate embedding result: {len(candidate_embedding) if candidate_embedding else 'None'}")
 
                     if not candidate_embedding:
-                        print(f"   ❌ Failed to get embedding for candidate: {candidate['name']}")
-                        logger.warning(f"   ❌ Failed to get embedding for candidate: {candidate['name']}")
+                        print(f"    Failed to get embedding for candidate: {candidate['name']}")
+                        logger.warning(f"    Failed to get embedding for candidate: {candidate['name']}")
                         continue
 
                     total_api_calls += 1
@@ -263,8 +271,8 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     similarity_score = calculate_similarity_score(job_embedding, candidate_embedding)
 
                     # Log similarity score for debugging
-                    print(f"   📊 {candidate['name']}: similarity = {similarity_score:.3f} (threshold: {MATCHING_THRESHOLD})")
-                    logger.info(f"   📊 {candidate['name']}: similarity = {similarity_score:.3f} (threshold: {MATCHING_THRESHOLD})")
+                    print(f"    {candidate['name']}: similarity = {similarity_score:.3f} (threshold: {MATCHING_THRESHOLD})")
+                    logger.info(f"    {candidate['name']}: similarity = {similarity_score:.3f} (threshold: {MATCHING_THRESHOLD})")
 
                     # Only include matches above threshold (configurable, default 0.5)
                     if similarity_score >= MATCHING_THRESHOLD:
@@ -290,9 +298,9 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     logger.error(f"Error matching candidate {candidate['name']}: {e}")
                     continue
 
-            # Sort matches by score (highest first) and take top 3
+            # Sort matches by score (highest first) and take top 3 best candidates
             matches.sort(key=lambda x: x["score"], reverse=True)
-            top_matches = matches[:3]
+            top_matches = matches[:3]  # Always take top 3 highest scoring candidates
 
             # Log matching results
             print(f"   ✅ Found {len(matches)} total matches, selected top {len(top_matches)}")
