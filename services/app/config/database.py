@@ -1,0 +1,89 @@
+"""
+Database configuration and connection management
+Converted from backend/src/config/database.js
+"""
+import os
+from typing import Optional
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo.errors import ConnectionFailure
+import logging
+
+logger = logging.getLogger(__name__)
+
+class Database:
+    client: Optional[AsyncIOMotorClient] = None
+    database: Optional[AsyncIOMotorDatabase] = None
+
+db = Database()
+
+async def connect_to_mongo():
+    """Connect to MongoDB database"""
+    try:
+        # Get MongoDB URI from environment variables
+        mongo_uri = os.getenv("MONGODB_URI_TEST") if os.getenv("NODE_ENV") == "test" else os.getenv("MONGODB_URI")
+
+        if not mongo_uri:
+            raise ValueError("MongoDB URI is not defined in environment variables")
+
+        logger.info("🔄 Connecting to MongoDB...")
+
+        # Hide credentials in logs for security
+        safe_uri = mongo_uri.replace(mongo_uri.split("@")[0].split("//")[1], "***:***") if "@" in mongo_uri else mongo_uri
+        logger.info(f" Database URI: {safe_uri}")
+
+        # Connect to MongoDB with Motor AsyncIOMotorClient
+        db.client = AsyncIOMotorClient(
+            mongo_uri,
+            maxPoolSize=10,
+            serverSelectionTimeoutMS=5000,
+            socketTimeoutMS=45000,
+        )
+
+        # Test the connection with a simple ping
+        await db.client.admin.command('ping')
+
+        # Extract database name from URI or use default
+        # For MongoDB Atlas URIs without explicit database name, use default
+        if "/" in mongo_uri and not mongo_uri.endswith("/"):
+            db_name = mongo_uri.split("/")[-1].split("?")[0]
+            if not db_name:  # If empty after splitting
+                db_name = "ai_recruitment"
+        else:
+            db_name = "ai_recruitment"
+
+        db.database = db.client[db_name]
+
+        logger.info(f" MongoDB Connected successfully!")
+        logger.info(f" Database Name: {db_name}")
+
+    except ConnectionFailure as e:
+        logger.error(f" Database connection failed: {e}")
+        raise
+    except Exception as e:
+        logger.error(f" Database connection failed: {e}")
+        raise
+
+async def close_mongo_connection():
+    """Close MongoDB connection"""
+    if db.client:
+        db.client.close()
+        logger.info("🔴 MongoDB connection closed")
+
+def get_database():
+    """Get database instance"""
+    return db.database
+
+def is_connected() -> bool:
+    """Check if database is connected"""
+    return db.client is not None and db.database is not None
+
+async def get_connection_status() -> str:
+    """Get connection status"""
+    if db.client is None:
+        return "disconnected"
+    try:
+        # This will raise an exception if not connected
+        await db.client.server_info()
+        return "connected"
+    except:
+        return "disconnected"

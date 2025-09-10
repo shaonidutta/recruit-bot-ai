@@ -1,150 +1,178 @@
-import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/Card';
-import { Badge } from '../../../components/ui/Badge';
-import { cn } from '../../../utils/cn';
-import { getMockData, simulateRealTimeUpdate } from '../../../data/mockData';
+import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import { AnimatedCounter, GrowthIndicator, LiveIndicator } from '../../../components/ui/AnimatedCounter';
+import { useJobs } from '../../../hooks/useJobs';
+import { useHealth } from '../../../hooks/useHealth';
+import { useRealTimeData } from '../../../hooks/useRealTimeData';
+import { jobsService } from '../../../api/services/jobsService';
+import { candidatesService } from '../../../api/services/candidatesService';
+import { useState, useEffect } from 'react';
 
-const MetricCard = ({ title, value, change, trend, percentage, icon, color, isAnimating }) => {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  // Animate counter on mount and value changes
-  useEffect(() => {
-    const duration = 1000; // 1 second
-    const steps = 30;
-    const increment = value / steps;
-    let current = 0;
-    
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= value) {
-        setDisplayValue(value);
-        clearInterval(timer);
-      } else {
-        setDisplayValue(Math.floor(current));
-      }
-    }, duration / steps);
-
-    return () => clearInterval(timer);
-  }, [value]);
-
-  const trendColor = trend === 'up' ? 'text-green-600' : 'text-red-600';
-  const trendIcon = trend === 'up' ? '↗️' : '↘️';
-  const bgGradient = color === 'blue' ? 'from-blue-500 to-blue-600' :
-                    color === 'green' ? 'from-green-500 to-green-600' :
-                    color === 'orange' ? 'from-orange-500 to-orange-600' :
-                    'from-purple-500 to-purple-600';
-
-  return (
-    <Card className={cn(
-      "relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-105",
-      isAnimating && "ring-2 ring-blue-500 ring-opacity-50"
-    )}>
-      {/* Background gradient */}
-      <div className={cn(
-        "absolute top-0 right-0 w-20 h-20 bg-gradient-to-br opacity-10 rounded-full -mr-10 -mt-10",
-        bgGradient
-      )} />
-      
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-slate-600">
-          {title}
-        </CardTitle>
-        <span className="text-2xl">{icon}</span>
-      </CardHeader>
-      
-      <CardContent>
-        <div className="flex items-baseline space-x-2">
-          <div className="text-3xl font-bold text-slate-900">
-            {displayValue.toLocaleString()}
+const MetricCard = ({
+  title,
+  value,
+  previousValue,
+  loading,
+  error,
+  icon,
+  color = 'blue',
+  subtitle,
+  isUpdating,
+  lastUpdated,
+  formatter
+}) => (
+  <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 bg-gradient-to-br from-white to-gray-50 border-0 shadow-lg">
+    {/* Gradient accent bar */}
+    <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${
+      color === 'green' ? 'from-green-500 to-green-600' :
+      color === 'red' ? 'from-red-500 to-red-600' :
+      color === 'orange' ? 'from-orange-500 to-orange-600' :
+      color === 'purple' ? 'from-purple-500 to-purple-600' :
+      'from-blue-500 to-blue-600'
+    }`} />
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium text-slate-600">
+        {title}
+      </CardTitle>
+      <div className={`text-2xl transition-colors duration-300 ${
+        color === 'green' ? 'text-green-500' :
+        color === 'red' ? 'text-red-500' :
+        color === 'orange' ? 'text-orange-500' :
+        color === 'purple' ? 'text-purple-500' :
+        'text-blue-500'
+      }`}>
+        {icon}
+      </div>
+    </CardHeader>
+    <CardContent>
+      {loading ? (
+        <div className="flex items-center space-x-2">
+          <LoadingSpinner size="sm" />
+          <span className="text-sm text-slate-500">Loading...</span>
+        </div>
+      ) : error ? (
+        <div className="text-red-500 text-sm">Error loading data</div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <div className="text-2xl font-bold text-slate-900">
+              {typeof value === 'string' ? value : (
+                <AnimatedCounter
+                  value={value || 0}
+                  formatter={formatter || ((val) => val.toLocaleString())}
+                />
+              )}
+            </div>
+            {previousValue !== undefined && (
+              <GrowthIndicator
+                current={value || 0}
+                previous={previousValue || 0}
+              />
+            )}
           </div>
-          {change !== 0 && (
-            <Badge 
-              variant={trend === 'up' ? 'success' : 'destructive'}
-              className="text-xs"
-            >
-              {trendIcon} {Math.abs(change)}
-            </Badge>
-          )}
+
+          <div className="flex items-center justify-between">
+            {subtitle && (
+              <p className="text-xs text-slate-500">{subtitle}</p>
+            )}
+            <LiveIndicator
+              isUpdating={isUpdating}
+              lastUpdated={lastUpdated}
+              className="ml-auto"
+            />
+          </div>
         </div>
-        
-        <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-slate-500">
-            Today
-          </p>
-          {percentage && (
-            <p className={cn("text-xs font-medium", trendColor)}>
-              +{percentage}% from yesterday
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
+      )}
+    </CardContent>
+  </Card>
+);
 
 const MetricsCards = () => {
-  const [metrics, setMetrics] = useState(getMockData('metrics'));
-  const [animatingCard, setAnimatingCard] = useState(null);
+  const { stats, loading: jobsLoading, error: jobsError } = useJobs();
+  const { health, loading: healthLoading, error: healthError, isHealthy } = useHealth();
 
-  // Simulate real-time updates every 30 seconds
+  // Store previous values for growth calculation
+  const [previousStats, setPreviousStats] = useState(null);
+
+  // Real-time polling for enhanced metrics
+  const {
+    data: realtimeStats,
+    loading: realtimeLoading,
+    error: realtimeError,
+    lastUpdated
+  } = useRealTimeData(
+    async () => {
+      const response = await jobsService.getStats();
+      return response.success ? response.data.stats : null;
+    },
+    30000 // Poll every 30 seconds
+  );
+
+  // Update previous stats when new data arrives
   useEffect(() => {
-    const interval = setInterval(() => {
-      const updatedMetrics = simulateRealTimeUpdate('metrics');
-      if (updatedMetrics) {
-        setMetrics(updatedMetrics);
-        setAnimatingCard('jobs'); // Animate the jobs card
-        setTimeout(() => setAnimatingCard(null), 2000);
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const metricsConfig = [
-    {
-      key: 'jobsDiscovered',
-      title: 'Jobs Discovered',
-      icon: '📋',
-      color: 'blue'
-    },
-    {
-      key: 'outreachSent',
-      title: 'Outreach Sent',
-      icon: '📤',
-      color: 'green'
-    },
-    {
-      key: 'responsesReceived',
-      title: 'Responses Received',
-      icon: '📥',
-      color: 'orange'
-    },
-    {
-      key: 'matchesMade',
-      title: 'Matches Made',
-      icon: '🎯',
-      color: 'purple'
+    if (realtimeStats && stats) {
+      setPreviousStats(stats);
     }
-  ];
+  }, [realtimeStats, stats]);
+
+  // Use real-time data if available, fallback to regular stats
+  const currentStats = realtimeStats || stats;
+  const isLoading = (jobsLoading && !stats) || (realtimeLoading && !realtimeStats && !stats);
+  const hasError = jobsError || realtimeError;
+
+  // Only show updating indicator if we don't have any data yet, not during routine polling
+  const isUpdating = realtimeLoading && !currentStats;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {metricsConfig.map((config) => {
-        const metricData = metrics[config.key];
-        return (
-          <MetricCard
-            key={config.key}
-            title={config.title}
-            value={metricData.today}
-            change={metricData.change}
-            trend={metricData.trend}
-            percentage={metricData.percentage}
-            icon={config.icon}
-            color={config.color}
-            isAnimating={animatingCard === config.key}
-          />
-        );
-      })}
+      <MetricCard
+        title="Total Jobs"
+        value={currentStats?.total_jobs}
+        previousValue={previousStats?.total_jobs}
+        loading={isLoading}
+        error={hasError}
+        icon="💼"
+        color="blue"
+        subtitle="Jobs discovered"
+        isUpdating={isUpdating}
+        lastUpdated={lastUpdated}
+      />
+      <MetricCard
+        title="Active Jobs"
+        value={currentStats?.active_jobs}
+        previousValue={previousStats?.active_jobs}
+        loading={isLoading}
+        error={hasError}
+        icon="🎯"
+        color="green"
+        subtitle="Currently active"
+        isUpdating={isUpdating}
+        lastUpdated={lastUpdated}
+      />
+      <MetricCard
+        title="Total Candidates"
+        value={currentStats?.total_candidates}
+        previousValue={previousStats?.total_candidates}
+        loading={isLoading}
+        error={hasError}
+        icon="👥"
+        color="purple"
+        subtitle="Candidate profiles"
+        isUpdating={isUpdating}
+        lastUpdated={lastUpdated}
+      />
+      <MetricCard
+        title="Total Matches"
+        value={currentStats?.total_matches || 0}
+        previousValue={previousStats?.total_matches}
+        loading={isLoading}
+        error={hasError}
+        icon="⚡"
+        color="orange"
+        subtitle="Job-candidate matches"
+        isUpdating={isUpdating}
+        lastUpdated={lastUpdated}
+      />
     </div>
   );
 };

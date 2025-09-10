@@ -40,4 +40,5 @@ async def fetch_google_jobs(job_title: str) -> List[Dict]:
             })
 
     print(f"✅ Found {len(jobs)} Google jobs.")
+>>>>>>> 53c8b183ea0ecd9b7c82b084d06080467194bae2
     return jobs

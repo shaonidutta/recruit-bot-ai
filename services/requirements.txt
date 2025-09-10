@@ -1,13 +1,19 @@
+# FastAPI and server
 fastapi
 uvicorn[standard]
-pydantic
-requests
-python-dotenv
-playwright
-spacy
-tenacity
+
+# Database
+motor
+pymongo
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+
+# HTTP requests
 httpx
-feedparser
-serpapi
-google-search-results 
-bs4
+requests
+
+# Environment & Configuration
+python-dotenv
