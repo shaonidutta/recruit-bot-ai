@@ -38,64 +38,31 @@ const DashboardPage = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Enhanced Welcome Section */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-purple-700 to-indigo-800 rounded-2xl p-8 text-white shadow-2xl">
-          {/* Background Pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-0 w-full h-full">
-              <div className="w-full h-full" style={{
-                backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
-                backgroundSize: '20px 20px'
-              }}></div>
-            </div>
-          </div>
-
-          <div className="relative flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                  <span className="text-2xl">🤖</span>
+        {/* Clean Header Section */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center space-x-3 mb-2">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold mb-1 bg-gradient-to-r from-white via-blue-100 to-cyan-100 bg-clip-text text-transparent">
-                    AI Recruitment Command Center
-                  </h1>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    <span className="text-blue-100 text-sm font-medium">Live System</span>
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-blue-100 text-lg mb-6 max-w-2xl leading-relaxed">
-                Your intelligent AI agents are working around the clock to discover opportunities,
-                match talent, and automate outreach campaigns.
-              </p>
-
-              <div className="flex items-center space-x-6">
-                <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2">
-                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-green-100">System Active</span>
-                </div>
-                <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2">
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-yellow-100">AI Agents Ready</span>
-                </div>
-                <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2">
-                  <div className="w-3 h-3 bg-cyan-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-cyan-100">Auto-Discovery</span>
+                  <h1 className="text-2xl font-bold text-gray-900">AI Recruitment Dashboard</h1>
+                  <p className="text-gray-600 text-sm">Manage your recruitment workflow and analytics</p>
                 </div>
               </div>
             </div>
 
-            {/* Floating AI Icon */}
-            <div className="hidden lg:block">
-              <div className="relative">
-                <div className="w-32 h-32 bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-sm rounded-3xl flex items-center justify-center transform rotate-12 hover:rotate-0 transition-transform duration-500">
-                  <span className="text-6xl transform -rotate-12">🤖</span>
-                </div>
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-400 rounded-full animate-ping"></div>
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-400 rounded-full"></div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 bg-green-50 px-3 py-1.5 rounded-full">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-green-700 text-sm font-medium">System Online</span>
+              </div>
+              <div className="flex items-center space-x-2 bg-blue-50 px-3 py-1.5 rounded-full">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-blue-700 text-sm font-medium">AI Active</span>
               </div>
             </div>
           </div>
@@ -119,10 +86,10 @@ const DashboardPage = () => {
 
         {/* Dashboard Analytics */}
         <div className="mt-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
-            <span>📊</span>
-            <span>Analytics Dashboard</span>
-          </h2>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Analytics Overview</h2>
+            <p className="text-sm text-gray-600">Track your recruitment performance and metrics</p>
+          </div>
           <DashboardAnalytics />
         </div>
 
@@ -130,10 +97,10 @@ const DashboardPage = () => {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
           {/* Jobs List */}
           <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
-              <span>💼</span>
-              <span>Recent Job Discoveries</span>
-            </h2>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Recent Jobs</h2>
+              <p className="text-sm text-gray-600">Latest job opportunities discovered by AI agents</p>
+            </div>
             <JobsList
               jobs={jobs}
               loading={loading}

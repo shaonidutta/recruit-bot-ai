@@ -23,7 +23,8 @@ async def connect_to_mongo():
         mongo_uri = os.getenv("MONGODB_URI_TEST") if os.getenv("NODE_ENV") == "test" else os.getenv("MONGODB_URI")
 
         if not mongo_uri:
-            raise ValueError("MongoDB URI is not defined in environment variables")
+            logger.warning("⚠️ MongoDB URI is not defined - running without database")
+            return
 
         logger.info("🔄 Connecting to MongoDB...")
 
@@ -57,11 +58,15 @@ async def connect_to_mongo():
         logger.info(f" Database Name: {db_name}")
 
     except ConnectionFailure as e:
-        logger.error(f" Database connection failed: {e}")
-        raise
+        logger.warning(f"⚠️ Database connection failed: {e}")
+        logger.warning("⚠️ Running without database connection")
+        db.client = None
+        db.database = None
     except Exception as e:
-        logger.error(f" Database connection failed: {e}")
-        raise
+        logger.warning(f"⚠️ Database connection failed: {e}")
+        logger.warning("⚠️ Running without database connection")
+        db.client = None
+        db.database = None
 
 async def close_mongo_connection():
     """Close MongoDB connection"""

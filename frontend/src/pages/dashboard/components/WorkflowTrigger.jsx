@@ -147,19 +147,19 @@ const WorkflowTrigger = ({ onWorkflowComplete }) => {
   };
 
   return (
-    <Card className="w-full bg-gradient-to-br from-white to-blue-50 border-0 shadow-xl">
-      {/* Gradient accent bar */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-500" />
-      <CardHeader className="relative">
+    <Card className="w-full bg-white border border-gray-200 shadow-sm">
+      <CardHeader>
         <CardTitle className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-            <span className="text-white text-xl">🤖</span>
+          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
           </div>
           <div>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="text-lg font-semibold text-gray-900">
               Job Discovery Workflow
             </span>
-            <p className="text-sm text-gray-500 font-normal">AI-powered talent acquisition</p>
+            <p className="text-sm text-gray-600 font-normal">AI-powered talent acquisition</p>
           </div>
         </CardTitle>
       </CardHeader>

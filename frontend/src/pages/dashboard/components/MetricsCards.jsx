@@ -21,27 +21,29 @@ const MetricCard = ({
   lastUpdated,
   formatter
 }) => (
-  <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 bg-gradient-to-br from-white to-gray-50 border-0 shadow-lg">
-    {/* Gradient accent bar */}
-    <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${
-      color === 'green' ? 'from-green-500 to-green-600' :
-      color === 'red' ? 'from-red-500 to-red-600' :
-      color === 'orange' ? 'from-orange-500 to-orange-600' :
-      color === 'purple' ? 'from-purple-500 to-purple-600' :
-      'from-blue-500 to-blue-600'
-    }`} />
+  <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium text-slate-600">
+      <CardTitle className="text-sm font-medium text-gray-600">
         {title}
       </CardTitle>
-      <div className={`text-2xl transition-colors duration-300 ${
-        color === 'green' ? 'text-green-500' :
-        color === 'red' ? 'text-red-500' :
-        color === 'orange' ? 'text-orange-500' :
-        color === 'purple' ? 'text-purple-500' :
-        'text-blue-500'
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${
+        color === 'green' ? 'bg-green-100 text-green-600' :
+        color === 'red' ? 'bg-red-100 text-red-600' :
+        color === 'orange' ? 'bg-orange-100 text-orange-600' :
+        color === 'purple' ? 'bg-purple-100 text-purple-600' :
+        'bg-blue-100 text-blue-600'
       }`}>
-        {icon}
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {color === 'green' ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          ) : color === 'purple' ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+          ) : color === 'orange' ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m8 6V8a2 2 0 00-2-2H10a2 2 0 00-2 2v8a2 2 0 002 2h4a2 2 0 002-2z" />
+          )}
+        </svg>
       </div>
     </CardHeader>
     <CardContent>
@@ -53,9 +55,9 @@ const MetricCard = ({
       ) : error ? (
         <div className="text-red-500 text-sm">Error loading data</div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1">
           <div className="flex items-center space-x-2">
-            <div className="text-2xl font-bold text-slate-900">
+            <div className="text-2xl font-bold text-gray-900">
               {typeof value === 'string' ? value : (
                 <AnimatedCounter
                   value={value || 0}
@@ -71,16 +73,9 @@ const MetricCard = ({
             )}
           </div>
 
-          <div className="flex items-center justify-between">
-            {subtitle && (
-              <p className="text-xs text-slate-500">{subtitle}</p>
-            )}
-            <LiveIndicator
-              isUpdating={isUpdating}
-              lastUpdated={lastUpdated}
-              className="ml-auto"
-            />
-          </div>
+          {subtitle && (
+            <p className="text-xs text-gray-500">{subtitle}</p>
+          )}
         </div>
       )}
     </CardContent>
