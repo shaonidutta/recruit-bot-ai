@@ -5,19 +5,24 @@ Converted from backend/src/config/constants.js
 
 # Job Sources Configuration
 JOB_SOURCES = {
-    "INDEED": "agents/indeed",
-    "LINKEDIN": "agents/linkedin",
+    "LINKEDIN": "linkedin",
+    "INDEED": "indeed",
+    "GOOGLE": "google"
 }
 
 # Agent Configuration
 AGENT_CONFIG = {
     "linkedin": {
         "name": "linkedin",
-        "endpoint": "agents/linkedin"
+        "function": "fetch_linkedin_jobs"
     },
     "indeed": {
-        "name": "indeed", 
-        "endpoint": "agents/indeed"
+        "name": "indeed",
+        "function": "fetch_indeed_jobs"
+    },
+    "google": {
+        "name": "google",
+        "function": "fetch_google_jobs"
     }
 }
 

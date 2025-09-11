@@ -5,18 +5,17 @@ An autonomous, multi-agent platform that automates job discovery, intelligence e
 ## Project Structure
 
 ```
-├── backend/                 # Node.js Express Backend
-│   ├── src/
-│   │   ├── app.js          # Express app configuration
-│   │   ├── server.js       # Server entry point
-│   │   ├── routes/         # API routes
-│   │   ├── controllers/    # Route controllers
-│   │   ├── middlewares/    # Express middlewares
-│   │   ├── models/         # Data models
-│   │   ├── services/       # Business logic
-│   │   └── utils/          # Utility functions
-│   ├── Dockerfile         # Backend development container
-│   └── package.json       # Node.js dependencies
+├── services/               # Python FastAPI Backend
+│   ├── app/
+│   │   ├── main.py        # FastAPI application entry point
+│   │   ├── routes/        # API routes
+│   │   ├── agents/        # Job scraping agents
+│   │   ├── services/      # Business logic services
+│   │   ├── workflows/     # LangGraph workflow nodes
+│   │   ├── models/        # Data models
+│   │   └── config/        # Configuration files
+│   ├── Dockerfile         # Services development container
+│   └── requirements.txt   # Python dependencies
 ├── frontend/               # React Vite Frontend
 │   ├── src/
 │   │   ├── App.jsx        # Root React component
@@ -121,11 +120,11 @@ cd frontend
 npm run lint
 ```
 
-### Backend
+### Services (Python Backend)
 
 ```bash
-cd backend
-npm test
+cd services
+python -m pytest
 ```
 
 ## Docker Development
@@ -137,14 +136,10 @@ The project uses Docker Compose for development. The `dev.yml` file defines thre
     - React development server with hot-reload
     - Mounted volumes for real-time code changes
 
-2. Backend Container:
-
-    - Node.js Express server with nodemon
-    - Mounted volumes for auto-reloading
-
-3. Services Container:
+2. Services Container:
     - Python FastAPI with uvicorn
     - Hot-reload enabled for development
+    - AI agents and workflow orchestration
 
 Start all services:
 
