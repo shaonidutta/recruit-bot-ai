@@ -4,7 +4,7 @@ from typing import List, Dict
 from dotenv import load_dotenv
 
 # Load environment variables from .env
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 if not SERPAPI_KEY:
@@ -30,14 +30,21 @@ async def fetch_google_jobs(job_title: str) -> List[Dict]:
     jobs = []
 
     for job in jobs_data:
-        if "google" in str(job.get("via", "")).lower():
-            jobs.append({
-                "title": job.get("title"),
-                "company": job.get("company_name"),
-                "location": job.get("location"),
-                "description": job.get("description"),
-                "via": job.get("via"),
-            })
+        # Include all jobs from SerpAPI, not just Google-specific ones
+        # This gives us more comprehensive job coverage
+        job_data = {
+            "title": job.get("title"),
+            "company": job.get("company_name"),
+            "location": job.get("location"),
+            "description": job.get("description"),
+            "via": job.get("via"),
+            "source": "google_search",  # Mark as coming from Google search
+        }
+        # Only include jobs with valid title and company
+        if job_data["title"] and job_data["company"]:
+            jobs.append(job_data)
+        else:
+            print(f"⚠️ Skipping job with missing data: {job_data}")
 
     print(f"✅ Found {len(jobs)} Google jobs.")
     return jobs

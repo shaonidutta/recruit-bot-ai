@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 async def storage_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Store jobs and matches to database with comprehensive error handling"""
     logger.info("Starting enhanced storage with error handling")
-    logger.info(f"State keys in storage: {list(state.keys())}")
 
     # Store matched jobs (which contain the match data)
     matched_jobs = state.get("matched_jobs", [])
@@ -21,6 +20,11 @@ async def storage_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
     # Use matched_jobs if available (contains match data), otherwise fall back to enriched_jobs
     jobs_to_store = matched_jobs if matched_jobs else enriched_jobs
+
+    print(f"🔍 DEBUG STORAGE: Available state keys: {list(state.keys())}")
+    print(f"🔍 DEBUG STORAGE: Matched jobs: {len(matched_jobs)}")
+    print(f"🔍 DEBUG STORAGE: Enriched jobs: {len(enriched_jobs)}")
+    print(f"🔍 DEBUG STORAGE: Jobs to store: {len(jobs_to_store)}")
 
     logger.info(f"Jobs to store: {len(jobs_to_store)} ({'matched_jobs' if matched_jobs else 'enriched_jobs'})")
 
@@ -137,6 +141,10 @@ async def storage_node(state: Dict[str, Any]) -> Dict[str, Any]:
             logger.info(f"🔍 DEBUG STORAGE: Job '{job.get('title')}' has {len(matches)} matches to store")
             if matches:
                 logger.info(f"🔍 DEBUG STORAGE: First match data: {matches[0]}")
+                print(f"🔍 DEBUG STORAGE MATCH: Job '{job.get('title')}' has {len(matches)} matches")
+                print(f"🔍 DEBUG STORAGE MATCH: First match: {matches[0]}")
+            else:
+                print(f"🔍 DEBUG STORAGE MATCH: Job '{job.get('title')}' has NO matches")
 
             for match in matches:
                 try:

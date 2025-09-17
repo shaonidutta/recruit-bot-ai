@@ -4,7 +4,7 @@ from typing import List, Dict
 from dotenv import load_dotenv
 
 # Load environment variables from .env
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 if not SERPAPI_KEY:
@@ -27,17 +27,28 @@ async def fetch_linkedin_jobs(job_title: str) -> List[Dict]:
     search = GoogleSearch(params)
     results = search.get_dict()
     jobs_data = results.get("jobs_results", [])
+
+    # Debug: Print summary
+    print(f"🔍 SerpAPI response: {len(jobs_data)} total jobs found")
+
     jobs = []
 
     for job in jobs_data:
-        if "linkedin" in str(job.get("via", "")).lower():
-            jobs.append({
-                "title": job.get("title"),
-                "company": job.get("company_name"),
-                "location": job.get("location"),
-                "description": job.get("description"),
-                "via": job.get("via"),
-            })
+        # Include all jobs from SerpAPI, not just LinkedIn-specific ones
+        # This gives us more comprehensive job coverage
+        job_data = {
+            "title": job.get("title"),
+            "company": job.get("company_name"),
+            "location": job.get("location"),
+            "description": job.get("description"),
+            "via": job.get("via"),
+            "source": "linkedin_search",  # Mark as coming from LinkedIn search
+        }
+        # Only include jobs with valid title and company
+        if job_data["title"] and job_data["company"]:
+            jobs.append(job_data)
+        else:
+            print(f"⚠️ Skipping job with missing data: {job_data}")
 
     print(f"✅ Found {len(jobs)} LinkedIn jobs.")
     return jobs

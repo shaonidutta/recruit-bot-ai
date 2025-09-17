@@ -64,13 +64,8 @@ class EnrichmentService:
                 "per_page": 1
             }
 
-            logger.info(f"🔍 Searching Apollo for company: {company_name}")
-            logger.debug(f"🔧 Using API key: {APOLLO_API_KEY[:10]}...")
-
             async with session.post(url, json=payload, headers=headers) as response:
                 response_text = await response.text()
-                logger.debug(f"🔧 Apollo response status: {response.status}")
-                logger.debug(f"🔧 Apollo response: {response_text[:200]}...")
 
                 if response.status == 200:
                     data = await response.json()
@@ -96,14 +91,14 @@ class EnrichmentService:
                     else:
                         logger.warning(f"⚠️ No company found in Apollo for: {company_name}")
                 elif response.status == 401:
-                    logger.error(f"❌ Apollo API authentication failed - check API key")
+                    logger.error(f" Apollo API authentication failed - check API key")
                 elif response.status == 422:
-                    logger.error(f"❌ Apollo API insufficient credits: {response_text}")
+                    logger.error(f" Apollo API insufficient credits: {response_text}")
                 else:
-                    logger.error(f"❌ Apollo API error {response.status}: {response_text}")
+                    logger.error(f" Apollo API error {response.status}: {response_text}")
 
         except Exception as e:
-            logger.error(f"❌ Apollo company search failed for {company_name}: {e}")
+            logger.error(f" Apollo company search failed for {company_name}: {e}")
 
         return None
 

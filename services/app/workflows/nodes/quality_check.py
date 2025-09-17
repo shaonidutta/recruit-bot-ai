@@ -12,6 +12,11 @@ async def quality_check_node(state: Dict[str, Any]) -> Dict[str, Any]:
     logger.info("🔄 Starting quality check")
 
     parsed_jobs = state.get("parsed_jobs", [])
+    print(f"🔍 DEBUG QUALITY CHECK: Available state keys: {list(state.keys())}")
+    print(f"🔍 DEBUG QUALITY CHECK: Parsed jobs: {len(parsed_jobs)}")
+    logger.info(f"🔍 DEBUG Quality check - Available state keys: {list(state.keys())}")
+    logger.info(f"🔍 DEBUG Quality check - Parsed jobs: {len(parsed_jobs)}")
+
     if not parsed_jobs:
         state["quality_checked_jobs"] = []
         return state

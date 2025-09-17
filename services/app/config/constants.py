@@ -42,3 +42,6 @@ COLLECTIONS = {
 DEFAULT_KEYWORDS = "Software Engineer"
 DEFAULT_CRON_SCHEDULE = "0 2 * * *"  # 2:00 AM daily
 DEFAULT_TIMEZONE = "UTC"
+
+# Matching Configuration
+MATCHING_THRESHOLD = 0.4  # Minimum similarity score for candidate matches

@@ -16,6 +16,24 @@ from operator import add
 def keywords_reducer(x: str, y: str) -> str:
     return y if y else x
 
+# Custom reducer for job lists (replace with new value - each scraper writes once)
+def job_list_reducer(x: List[Dict[str, Any]], y: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return y if y else x
+
+# Custom reducer for dictionaries (merge dictionaries)
+def dict_reducer(x: Dict[str, Any], y: Dict[str, Any]) -> Dict[str, Any]:
+    if not x:
+        return y
+    if not y:
+        return x
+    result = x.copy()
+    result.update(y)
+    return result
+
+# Custom reducer for strings (last value wins)
+def string_reducer(x: str, y: str) -> str:
+    return y if y else x
+
 # Import agents
 from ..agents.linkedin_agent import fetch_linkedin_jobs
 from ..agents.indeed_agent import fetch_indeed_jobs
@@ -29,6 +47,8 @@ from ..workflows.nodes.quality_check import quality_check_node
 from ..workflows.nodes.matching import matching_node
 from ..workflows.nodes.storage import storage_node
 from .outreach_email_service import send_professional_outreach_email, send_sync_email  # NEW IMPORT
+from .llm_email_service import llm_email_service  # LLM Email Generation
+from .langsmith_integration import langsmith_service  # LangSmith Evaluation
 
 from ..config.constants import DEFAULT_KEYWORDS
 
@@ -39,29 +59,29 @@ class UnifiedRecruitmentState(TypedDict):
     # Input - use Annotated to allow concurrent access
     keywords: Annotated[str, keywords_reducer]  # Allow concurrent access
 
-    # Scraping results (parallel) - each modified by single node
-    linkedin_jobs: List[Dict[str, Any]]
-    indeed_jobs: List[Dict[str, Any]]
-    google_jobs: List[Dict[str, Any]]
+    # Scraping results (parallel) - use Annotated for concurrent access
+    linkedin_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
+    indeed_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
+    google_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
 
-    # Processing stages (sequential)
-    raw_jobs: List[Dict[str, Any]]
-    deduplicated_jobs: List[Dict[str, Any]]
-    enriched_jobs: List[Dict[str, Any]]
-    parsed_jobs: List[Dict[str, Any]]
-    quality_checked_jobs: List[Dict[str, Any]]
-    matched_jobs: List[Dict[str, Any]]
-    outreach_results: Dict[str, Any]  # Email outreach results
-    stored_jobs: List[Dict[str, Any]]
+    # Processing stages (sequential) - raw_jobs receives from multiple parallel scrapers
+    raw_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
+    deduplicated_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
+    enriched_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
+    parsed_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
+    quality_checked_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
+    matched_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
+    outreach_results: Annotated[Dict[str, Any], dict_reducer]  # Email outreach results
+    stored_jobs: Annotated[List[Dict[str, Any]], job_list_reducer]
 
     # Workflow metadata
-    workflow_id: str
-    current_step: str
-    started_at: str
-    completed_at: str
+    workflow_id: Annotated[str, string_reducer]
+    current_step: Annotated[str, string_reducer]
+    started_at: Annotated[str, string_reducer]
+    completed_at: Annotated[str, string_reducer]
     errors: Annotated[List[str], add]  # Allow concurrent updates
-    stats: Dict[str, Any]
-    config: Dict[str, Any]
+    stats: Annotated[Dict[str, Any], dict_reducer]
+    config: Annotated[Dict[str, Any], dict_reducer]
 
 class UnifiedOrchestrator:
     """Unified LangGraph orchestrator for complete recruitment pipeline"""
@@ -76,7 +96,7 @@ class UnifiedOrchestrator:
         # Add initialization node
         workflow.add_node("init", self._init_node)
 
-        # Add scraping nodes (parallel execution)
+        # Add scraping nodes (TRUE parallel execution - all run simultaneously)
         workflow.add_node("linkedin_scraper", self._linkedin_node)
         workflow.add_node("indeed_scraper", self._indeed_node)
         workflow.add_node("google_scraper", self._google_node)
@@ -96,10 +116,14 @@ class UnifiedOrchestrator:
         # Set single entry point
         workflow.set_entry_point("init")
 
-        # Connect scrapers sequentially to avoid concurrent state access
+        # Connect scrapers in PARALLEL - all start after init completes
         workflow.add_edge("init", "linkedin_scraper")
-        workflow.add_edge("linkedin_scraper", "indeed_scraper")
-        workflow.add_edge("indeed_scraper", "google_scraper")
+        workflow.add_edge("init", "indeed_scraper")
+        workflow.add_edge("init", "google_scraper")
+
+        # All scrapers feed into aggregation node
+        workflow.add_edge("linkedin_scraper", "aggregate")
+        workflow.add_edge("indeed_scraper", "aggregate")
         workflow.add_edge("google_scraper", "aggregate")
         
         # Sequential processing pipeline - CORRECTED ORDER
@@ -120,15 +144,11 @@ class UnifiedOrchestrator:
 
         for attempt in range(max_retries + 1):
             try:
-                logger.info(f"Workflow attempt {attempt + 1}/{max_retries + 1}")
-                logger.info(f"DEBUG: About to invoke graph with state keys: {list(initial_state.keys())}")
+                if attempt > 0:
+                    logger.info(f"Workflow retry attempt {attempt + 1}/{max_retries + 1}")
 
                 # Run the workflow
-                logger.info("DEBUG: About to invoke LangGraph")
                 final_state = await self.graph.ainvoke(initial_state)
-                logger.info("DEBUG: LangGraph execution completed")
-
-                logger.info(f"DEBUG: Graph execution completed. Final state keys: {list(final_state.keys())}")
 
                 # Check for critical failures
                 errors = final_state.get("errors", [])
@@ -168,33 +188,23 @@ class UnifiedOrchestrator:
     async def _run_node_with_error_handling(self, node_name: str, node_func, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Run a workflow node with comprehensive error handling"""
         try:
-            print(f"🔧 DEBUG: About to run {node_name} node")
             logger.info(f"Starting {node_name}")
-            logger.info(f"🔧 DEBUG: About to run {node_name} node")
             start_time = datetime.now()
 
-            # Run the node
-            print(f"🔧 DEBUG: Calling {node_name} function: {node_func}")
-            logger.info(f"🔧 DEBUG: Calling {node_name} function: {node_func}")
-            result = await node_func(dict(state))
-            print(f"🔧 DEBUG: {node_name} function returned: {type(result)}")
-            logger.info(f"🔧 DEBUG: {node_name} function returned: {type(result)}")
+            # Run the node - convert state to dict for node function
+            state_dict = dict(state)
+            result = await node_func(state_dict)
 
             # Calculate processing time
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.info(f"{node_name} completed in {processing_time:.2f}s")
 
-            # Update state with results
-            for key, value in result.items():
-                if key in state:
-                    state[key] = value
-
-            return state
+            # Return the result directly - LangGraph will handle state merging
+            # Convert back to the expected state type
+            return result  # type: ignore
 
         except Exception as e:
-            print(f"🚨 ERROR in {node_name}: {e}")
-            logger.error(f"{node_name} failed: {e}")
-            logger.error(f"🚨 FULL ERROR TRACEBACK for {node_name}:", exc_info=True)
+            logger.error(f"{node_name} failed: {e}", exc_info=True)
 
             # Add error to state
             if "errors" not in state:
@@ -204,7 +214,7 @@ class UnifiedOrchestrator:
             # For critical nodes, we might want to stop the workflow
             critical_nodes = ["storage", "database"]
             if any(critical in node_name.lower() for critical in critical_nodes):
-                logger.error(f"🚨 Critical node {node_name} failed, workflow may be compromised")
+                logger.error(f"Critical node {node_name} failed, workflow may be compromised")
 
             return state
 
@@ -215,9 +225,10 @@ class UnifiedOrchestrator:
         logger.info(f"Keywords: {state['keywords']}")
         return state
 
-    # Scraping Nodes (Parallel) with Enhanced Error Handling
+    # Scraping Nodes (Parallel) with Enhanced Error Handling & LangSmith Tracing
+    @langsmith_service.trace_workflow_step("linkedin_scraper", {"source": "linkedin", "api": "serpapi"})
     async def _linkedin_node(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
-        """LinkedIn scraping agent with enhanced error handling"""
+        """LinkedIn scraping agent with enhanced error handling and LangSmith tracing"""
         try:
             logger.info("🔍 Running LinkedIn agent...")
             start_time = datetime.now()
@@ -280,28 +291,31 @@ class UnifiedOrchestrator:
     async def _aggregate_node(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Aggregate all scraping results"""
         try:
-            logger.info("DEBUG: AGGREGATE NODE CALLED!")
             logger.info("Aggregating scraping results...")
-            logger.info(f"State keys before aggregation: {list(state.keys())}")
 
             # Combine all jobs
             all_jobs = []
-            
+
             # Add source metadata
             for job in state.get("linkedin_jobs", []):
                 job["source"] = "linkedin"
                 all_jobs.append(job)
-            
+
             for job in state.get("indeed_jobs", []):
                 job["source"] = "indeed"
                 all_jobs.append(job)
-                
+
             for job in state.get("google_jobs", []):
                 job["source"] = "google"
                 all_jobs.append(job)
-            
+
             state["raw_jobs"] = all_jobs
-            
+
+            # DEBUG: Print first job to see structure
+            if all_jobs:
+                print(f"🔍 DEBUG AGGREGATION: First job: {all_jobs[0].get('title')} at {all_jobs[0].get('company')}")
+                logger.info(f"🔍 DEBUG First aggregated job: {all_jobs[0]}")
+
             # Initialize stats
             state["stats"] = {
                 "total_jobs_discovered": len(all_jobs),
@@ -310,7 +324,7 @@ class UnifiedOrchestrator:
                 "google_jobs": len(state.get("google_jobs", [])),
                 "processing_time_seconds": 0
             }
-            
+
             logger.info(f"Aggregated {len(all_jobs)} total jobs")
 
         except Exception as e:
@@ -320,67 +334,120 @@ class UnifiedOrchestrator:
         
         return state
 
-    # Email Outreach Node
+    # Email Outreach Node - Enhanced with LLM Generation & LangSmith Tracing
+    @langsmith_service.trace_workflow_step("llm_email_outreach", {"method": "llm_generated", "demo_mode": True})
     async def _outreach_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Send outreach emails to hiring managers for matched jobs"""
+        """Send LLM-generated outreach emails to hiring managers for matched jobs with evaluation"""
         try:
-            logger.info("Starting email outreach...")
+            logger.info("🚀 Starting LLM-powered email outreach...")
 
             # Get matched jobs from state
             matched_jobs = state.get("matched_jobs", [])
             if not matched_jobs:
                 logger.info("No matched jobs for outreach")
-                state["outreach_results"] = {"emails_sent": 0, "emails_failed": 0}
+                state["outreach_results"] = {"emails_sent": 0, "emails_failed": 0, "llm_generated": 0}
                 return state
 
-            # Skip contacts loading - using direct email configuration
-            # Contacts functionality kept in code but not used in workflow
-            demo_contact = {"email": "abhijeet.kr.chaurasiya@gmail.com", "name": "Demo Contact"}
+            # Demo configuration - emails go to demo account
+            demo_contact = {"email": "agtshaonidutta2k@gmail.com", "name": "Demo Recruiter"}
             emails_sent = 0
             emails_failed = 0
+            llm_generated = 0
+            email_details = []
 
             # Send outreach email for each matched job (limit to 3 for demo)
             for job in matched_jobs[:3]:  # Limit to first 3 jobs for demo
                 try:
                     # Get job details
-                    job_title = job.get("title", "Position")
-                    company_name = job.get("company", "Company")
+                    job_title = job.get("title", "Software Engineer")
+                    company_name = job.get("company", "Tech Company")
+
+                    # Get company data if available
+                    company_data = job.get("company_data", {})
+                    company_info = {
+                        "name": company_name,
+                        "industry": company_data.get("industry", "Technology"),
+                        "description": company_data.get("description", "Innovative technology company"),
+                        "employee_count": company_data.get("employee_count", "Growing startup"),
+                        "recent_news": "Expanding their engineering team"  # Demo data
+                    }
 
                     # Get matched candidates for this job
-                    candidates = job.get("matched_candidates", [])
-                    if not candidates:
+                    matches = job.get("matches", [])
+                    if not matches:
+                        logger.info(f"No matches for {job_title} at {company_name}, skipping email")
                         continue
 
-                    # Send professional outreach email
-                    result = await send_professional_outreach_email(
-                        recruiter_email=demo_contact["email"],
-                        job_title=job_title,
-                        company_name=company_name,
-                        company_achievement="Growing tech company",  # Demo data
-                        candidates=candidates[:2],  # Top 2 candidates
-                        subject=f"Top Candidates for {job_title} Position"
+                    # Use the top candidate for personalized email
+                    top_candidate = matches[0]  # Matches are already sorted by score
+
+                    # Generate LLM-powered personalized email with candidate information
+                    logger.info(f"🤖 Generating personalized email for {top_candidate.get('candidate_name')} → {job_title} at {company_name}")
+
+                    llm_email = await llm_email_service.generate_personalized_outreach_email(
+                        job_details={
+                            "title": job_title,
+                            "location": job.get("location", "Remote/Hybrid"),
+                            "technical_skills": job.get("technical_skills", ["Python", "React", "AWS"]),
+                            "experience_years_required": job.get("experience_years_required", "3-5")
+                        },
+                        company_info=company_info,
+                        matched_candidate=top_candidate,  # NEW: Pass candidate information
+                        email_type="candidate_presentation",  # NEW: Changed to candidate presentation
+                        tone="professional_warm",
+                        recruiter_name="Hiring Manager"
                     )
 
-                    if result.get("success", False):
-                        emails_sent += 1
-                        logger.info(f"Outreach email sent for {job_title} at {company_name}")
+                    if llm_email and llm_email.get("subject") and llm_email.get("body_html"):
+                        llm_generated += 1
+
+                        # Send the LLM-generated email
+                        success = send_sync_email(
+                            subject=llm_email["subject"],
+                            recipient=demo_contact["email"],
+                            body=llm_email["body_html"]
+                        )
+
+                        if success:
+                            emails_sent += 1
+                            logger.info(f"✅ LLM email sent for {job_title} at {company_name}")
+
+                            # Store email details for evaluation
+                            email_details.append({
+                                "job_title": job_title,
+                                "company_name": company_name,
+                                "subject": llm_email["subject"],
+                                "email_type": llm_email.get("email_type"),
+                                "tone": llm_email.get("tone"),
+                                "token_usage": llm_email.get("token_usage", 0),
+                                "personalization_elements": llm_email.get("personalization_elements", []),
+                                "sent_successfully": True
+                            })
+                        else:
+                            emails_failed += 1
+                            logger.error(f"❌ Failed to send LLM email for {job_title}")
                     else:
                         emails_failed += 1
-                        logger.error(f"Failed to send outreach email for {job_title}")
+                        logger.error(f"❌ LLM email generation failed for {job_title}")
 
                 except Exception as e:
                     emails_failed += 1
-                    logger.error(f"Error sending outreach email: {e}")
+                    logger.error(f"❌ Error in LLM email outreach: {e}")
 
-            # Store results
+            # Store comprehensive results with LLM metrics
             state["outreach_results"] = {
                 "emails_sent": emails_sent,
                 "emails_failed": emails_failed,
+                "llm_generated": llm_generated,
                 "contact_used": demo_contact["email"],
-                "jobs_processed": len(matched_jobs[:3])
+                "jobs_processed": len(matched_jobs[:3]),
+                "email_details": email_details,
+                "total_tokens_used": sum(detail.get("token_usage", 0) for detail in email_details),
+                "generation_method": "llm_powered",
+                "demo_mode": True
             }
 
-            logger.info(f"Outreach completed: {emails_sent} sent, {emails_failed} failed")
+            logger.info(f"🎯 LLM Outreach completed: {emails_sent} sent, {emails_failed} failed, {llm_generated} LLM-generated")
 
         except Exception as e:
             logger.error(f"Outreach node failed: {e}")
@@ -400,42 +467,18 @@ class UnifiedOrchestrator:
 
     async def _parsing_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Wrapper for parsing node with error handling"""
-        logger.info("DEBUG: PARSING WRAPPER CALLED!")
-        logger.info(f"State keys in parsing wrapper: {list(state.keys())}")
-        logger.info(f"Raw jobs count: {len(state.get('raw_jobs', []))}")
         return await self._run_node_with_error_handling("Parsing", parsing_node, state)
 
     async def _quality_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Wrapper for quality check node with error handling"""
-        logger.info("🚨 QUALITY CHECK WRAPPER CALLED - DEBUG")
-        logger.info(f"🔍 State keys in quality wrapper: {list(state.keys())}")
-        result = await self._run_node_with_error_handling("Quality Check", quality_check_node, state)
-        logger.info("🚨 QUALITY CHECK WRAPPER COMPLETED - DEBUG")
-        return result
+        return await self._run_node_with_error_handling("Quality Check", quality_check_node, state)
 
     async def _matching_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Wrapper for matching node with error handling"""
-        print("🚨 MATCHING WRAPPER CALLED - DEBUG")
-        logger.info("🚨 MATCHING WRAPPER CALLED - DEBUG")
-        logger.info(f"🔍 State keys in matching wrapper: {list(state.keys())}")
-        print(f"🔍 State keys in matching wrapper: {list(state.keys())}")
-
-        # DEBUG: Check quality_checked_jobs data
-        quality_jobs = state.get('quality_checked_jobs', [])
-        print(f"🔍 Quality checked jobs count: {len(quality_jobs)}")
-        logger.info(f"🔍 Quality checked jobs count: {len(quality_jobs)}")
-        if quality_jobs:
-            print(f"🔍 First quality job: {quality_jobs[0].get('title', 'No title')}")
-            logger.info(f"🔍 First quality job: {quality_jobs[0].get('title', 'No title')}")
-
-        result = await self._run_node_with_error_handling("Matching", matching_node, state)
-        print("🚨 MATCHING WRAPPER COMPLETED - DEBUG")
-        logger.info("🚨 MATCHING WRAPPER COMPLETED - DEBUG")
-        return result
+        return await self._run_node_with_error_handling("Matching", matching_node, state)
 
     async def _outreach_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Wrapper for email outreach node"""
-        logger.info("Step 7: Email Outreach")
         result = await self._outreach_node(dict(state))
         for key, value in result.items():
             if key in state:
@@ -444,12 +487,7 @@ class UnifiedOrchestrator:
 
     async def _storage_wrapper(self, state: UnifiedRecruitmentState) -> UnifiedRecruitmentState:
         """Wrapper for storage node with error handling"""
-        print("🚨 STORAGE WRAPPER CALLED - DEBUG")
-        logger.info("🚨 STORAGE WRAPPER CALLED - DEBUG")
-        result = await self._run_node_with_error_handling("Storage", storage_node, state)
-        print("🚨 STORAGE WRAPPER COMPLETED - DEBUG")
-        logger.info("🚨 STORAGE WRAPPER COMPLETED - DEBUG")
-        return result
+        return await self._run_node_with_error_handling("Storage", storage_node, state)
     
     def _get_candidate_title(self, match: dict) -> str:
         """Generate professional title for candidate based on match data"""
@@ -519,6 +557,10 @@ class UnifiedOrchestrator:
             await connect_to_mongo()
             logger.info("✅ Database connection established for workflow")
 
+            # Ensure cache cleanup task is started now that we have an event loop
+            from ..utils.caching import cache_manager
+            cache_manager.ensure_cleanup_started()
+
             # Track start time and generate workflow ID
             start_time = datetime.now(timezone.utc)
             workflow_id = f"unified_{start_time.strftime('%Y%m%d_%H%M%S')}"
@@ -548,25 +590,14 @@ class UnifiedOrchestrator:
                     "max_concurrent_parsings": 5,
                     "max_concurrent_quality_checks": 5,
                     "min_description_length": 50,
-                    "min_match_score": 0.7
+                    "min_match_score": 0.4
                 }
             }
 
-            print(f"🚨 STARTING UNIFIED WORKFLOW - DEBUG")
-            print(f"Starting unified workflow with keywords: '{initial_state['keywords']}'")
-            print(f"DEBUG: WORKFLOW FUNCTION CALLED! About to run graph...")
-            logger.info(f"🚨 STARTING UNIFIED WORKFLOW - DEBUG")
             logger.info(f"Starting unified workflow with keywords: '{initial_state['keywords']}'")
-            logger.info(f"DEBUG: WORKFLOW FUNCTION CALLED! About to run graph...")
 
             # Run the complete graph with error handling and retry logic
-            print(f"🚨 ABOUT TO CALL _run_workflow_with_retry - DEBUG")
-            logger.info(f"🚨 ABOUT TO CALL _run_workflow_with_retry - DEBUG")
             final_state = await self._run_workflow_with_retry(initial_state)
-            print(f"🚨 _run_workflow_with_retry COMPLETED - DEBUG")
-            logger.info(f"🚨 _run_workflow_with_retry COMPLETED - DEBUG")
-
-            logger.info(f"DEBUG: WORKFLOW COMPLETED! Final state keys: {list(final_state.keys())}")
 
             # Calculate processing time
             end_time = datetime.now(timezone.utc)
@@ -602,28 +633,26 @@ class UnifiedOrchestrator:
                 outreach_enabled = os.getenv("OUTREACH_EMAIL_ENABLED", "false").lower() == "true"
                 
                 if outreach_enabled and matched_jobs:
-                    logger.info(f"📧 Processing {len(matched_jobs)} matched jobs for outreach emails")
-                    
+                    logger.info(f"Processing {len(matched_jobs)} matched jobs for outreach emails")
+
                     # Group candidates by job for professional outreach
                     jobs_with_candidates = {}
-                    
+
                     # Extract matches from job objects (matching node stores matches within jobs)
                     for job in matched_jobs:
                         job_matches = job.get("matches", [])
                         job_id = job.get("id", job.get("_id", str(job.get("title", "unknown"))))
-                        logger.info(f"📧 Job '{job.get('title', 'Unknown')}' has {len(job_matches)} matches")
-                        
+
                         for match in job_matches:
                             match_score = match.get("score", 0)
-                            logger.info(f"📧 Candidate '{match.get('candidate_name', 'Unknown')}' score: {match_score}")
-                            
-                            if match_score >= 0.7:  # Only high-quality matches
+
+                            if match_score >= 0.4:  # Lowered threshold for realistic matches
                                 if job_id not in jobs_with_candidates:
                                     jobs_with_candidates[job_id] = {
                                         "job": job,
                                         "candidates": []
                                     }
-                                
+
                                 candidate_info = {
                                     "name": match.get("candidate_name", "Unknown"),
                                     "email": match.get("candidate_email", ""),
@@ -634,11 +663,8 @@ class UnifiedOrchestrator:
                                     "why_fit": self._get_why_candidate_fits(match, job)
                                 }
                                 jobs_with_candidates[job_id]["candidates"].append(candidate_info)
-                                logger.info(f"📧 Added candidate '{candidate_info['name']}' for outreach")
-                            else:
-                                logger.info(f"📧 Skipping candidate '{match.get('candidate_name', 'Unknown')}' - score {match_score} below 0.7 threshold")
-                    
-                    logger.info(f"📧 Found {len(jobs_with_candidates)} jobs with qualified candidates for outreach")
+
+                    logger.info(f"Found {len(jobs_with_candidates)} jobs with qualified candidates for outreach")
                     
                     # Send one professional email per job with all matched candidates
                     for job_id, job_data in jobs_with_candidates.items():
@@ -650,8 +676,6 @@ class UnifiedOrchestrator:
                             subject = f"Top Candidates for {job.get('title', 'Position')} at {job.get('company', 'Your Company')}"
                             company_achievement = self._get_company_achievement(job.get('company', 'Your Company'))
                             
-                            logger.info(f"📧 Sending outreach email for job '{job.get('title')}' with {len(candidates)} candidates")
-                            
                             result = await send_professional_outreach_email(
                                 recruiter_email=recruiter_email,
                                 job_title=job.get("title", "Position"),
@@ -660,32 +684,35 @@ class UnifiedOrchestrator:
                                 candidates=candidates,
                                 subject=subject
                             )
-                            
-                            logger.info(f"📧 Email result: {result}")
-                            
+
                             outreach_summary["total_emails"] += 1
                             if result.get("success"):
                                 outreach_summary["successful_emails"] += 1
-                                logger.info(f"✅ Email sent successfully for job '{job.get('title')}'")
+                                logger.info(f"Email sent successfully for job '{job.get('title')}'")
                             else:
                                 outreach_summary["failed_emails"] += 1
-                                logger.error(f"❌ Email failed for job '{job.get('title')}': {result.get('error')}")
+                                logger.error(f"Email failed for job '{job.get('title')}': {result.get('error')}")
                             
+                            # Get primary candidate name for display
+                            primary_candidate = candidates[0]["name"] if candidates else "Unknown"
+
                             outreach_summary["details"].append({
                                 "job_title": job.get("title"),
                                 "company": job.get("company"),
                                 "recruiter_email": recruiter_email,
+                                "candidate_name": primary_candidate,
                                 "candidates_count": len(candidates),
                                 "success": result.get("success", False),
-                                "error": result.get("error")
+                                "error": result.get("error"),
+                                "status": "sent" if result.get("success") else "failed"
                             })
                         else:
                             logger.warning(f"📧 Skipping email for job_id {job_id} - missing job or candidates data")
                 else:
                     if not outreach_enabled:
-                        logger.info("📧 Candidate outreach emails are disabled (OUTREACH_EMAIL_ENABLED=false)")
+                        logger.info("Candidate outreach emails are disabled")
                     if not matched_jobs:
-                        logger.info("📧 No matched jobs found for outreach emails")
+                        logger.info("No matched jobs found for outreach emails")
                 
                 # ALWAYS send summary email to abhijeet.kr.chaurasiya@gmail.com
                 try:
@@ -694,7 +721,7 @@ class UnifiedOrchestrator:
                     # Prepare workflow summary
                     total_jobs = len(final_state.get('stored_jobs', []))
                     total_matches = sum(len(job.get('matches', [])) for job in matched_jobs)
-                    high_quality_matches = sum(1 for job in matched_jobs for match in job.get('matches', []) if match.get('score', 0) >= 0.7)
+                    high_quality_matches = sum(1 for job in matched_jobs for match in job.get('matches', []) if match.get('score', 0) >= 0.4)
                     
                     summary_subject = f"AI Recruitment Workflow Summary - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
                     summary_body = f"""
@@ -708,7 +735,7 @@ class UnifiedOrchestrator:
                         <li><strong>Jobs Discovered:</strong> {stats.get('total_jobs_discovered', 0)}</li>
                         <li><strong>Jobs Stored:</strong> {total_jobs}</li>
                         <li><strong>Total Matches Found:</strong> {total_matches}</li>
-                        <li><strong>High-Quality Matches (≥0.7):</strong> {high_quality_matches}</li>
+                        <li><strong>High-Quality Matches (≥0.4):</strong> {high_quality_matches}</li>
                         <li><strong>Outreach Emails Sent:</strong> {outreach_summary.get('successful_emails', 0)}</li>
                         <li><strong>Failed Emails:</strong> {outreach_summary.get('failed_emails', 0)}</li>
                     </ul>
@@ -752,19 +779,19 @@ class UnifiedOrchestrator:
                     )
                     
                     if summary_result:
-                        logger.info("✅ Workflow summary email sent successfully to abhijeet.kr.chaurasiya@gmail.com")
+                        logger.info("Workflow summary email sent successfully")
                         outreach_summary["summary_email_sent"] = True
                     else:
-                        logger.error("❌ Failed to send workflow summary email")
+                        logger.error("Failed to send workflow summary email")
                         outreach_summary["summary_email_sent"] = False
-                        
+
                 except Exception as summary_email_err:
-                    logger.error(f"❌ Failed to send summary email: {summary_email_err}")
+                    logger.error(f"Failed to send summary email: {summary_email_err}")
                     outreach_summary["summary_email_sent"] = False
                     outreach_summary["summary_email_error"] = str(summary_email_err)
                      
             except Exception as outreach_err:
-                logger.error(f"📧 Outreach step failed: {outreach_err}")
+                logger.error(f"Outreach step failed: {outreach_err}")
                 outreach_summary = {"enabled": False, "error": str(outreach_err)}
                 
                 # Even if outreach fails, try to send summary email
@@ -787,9 +814,9 @@ class UnifiedOrchestrator:
                         recipient="abhijeet.kr.chaurasiya@gmail.com",
                         body=error_body
                     )
-                    logger.info("📧 Error notification email sent to abhijeet.kr.chaurasiya@gmail.com")
+                    logger.info("Error notification email sent")
                 except:
-                    logger.error("📧 Failed to send error notification email")
+                    logger.error("Failed to send error notification email")
             # --- END OUTREACH ---
             return {
                 "success": True,

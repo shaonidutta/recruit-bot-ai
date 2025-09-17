@@ -1,13 +1,19 @@
 """
-AI-Powered Matching Node using OpenAI Embeddings
+AI-Powered Matching Node using Sentence Transformers
+Optimized with parallel processing and caching for improved performance
 """
 
 import logging
 import os
+import asyncio
 from typing import Dict, Any, List
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
+
+from ...utils.parallel_processing import parallel_processor, performance_monitor
+from ...utils.caching import cache_manager, cached_embedding
+from ...config.database import get_database
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +36,9 @@ def get_embedding_model():
 # Configurable matching threshold (set to 0.4 for production)
 MATCHING_THRESHOLD = float(os.getenv("MATCHING_THRESHOLD", "0.4"))
 
-def get_embedding(text: str) -> List[float]:
-    """Get Sentence Transformer embedding for text (free alternative to OpenAI)"""
+@cached_embedding(model_name="all-MiniLM-L6-v2", ttl=604800)  # Cache for 7 days
+async def get_cached_embedding(text: str) -> List[float]:
+    """Get cached Sentence Transformer embedding for text"""
     try:
         model = get_embedding_model()
         if model is None:
@@ -45,6 +52,16 @@ def get_embedding(text: str) -> List[float]:
     except Exception as e:
         logger.error(f"Error getting Sentence Transformer embedding: {e}")
         return []
+
+def get_embedding(text: str) -> List[float]:
+    """Get Sentence Transformer embedding for text (free alternative to OpenAI)"""
+    # For backward compatibility, run async function in sync context
+    try:
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(get_cached_embedding(text))
+    except RuntimeError:
+        # If no event loop, create one
+        return asyncio.run(get_cached_embedding(text))
 
 def calculate_similarity_score(job_embedding: List[float], candidate_embedding: List[float]) -> float:
     """Calculate cosine similarity between job and candidate embeddings"""
@@ -65,6 +82,58 @@ def calculate_similarity_score(job_embedding: List[float], candidate_embedding: 
         return round(score, 3)
     except Exception as e:
         logger.error(f"Error calculating similarity: {e}")
+        return 0.0
+
+def calculate_skill_match_boost(job: Dict[str, Any], candidate: Dict[str, Any]) -> float:
+    """Calculate skill match boost to improve scores for exact skill matches"""
+    try:
+        # Extract skills from job description and candidate
+        job_title = job.get("title", "").lower()
+        job_description = job.get("description", "").lower()
+        candidate_skills = [skill.lower() for skill in candidate.get("skills", [])]
+
+        if not candidate_skills:
+            return 0.0
+
+        # Define key technical skills and their importance
+        skill_weights = {
+            # Programming languages
+            "python": 0.15, "java": 0.15, "javascript": 0.15, "c#": 0.15, ".net": 0.15,
+            "react": 0.12, "angular": 0.12, "vue": 0.12, "node.js": 0.12,
+            # Databases
+            "sql": 0.10, "mysql": 0.10, "postgresql": 0.10, "mongodb": 0.10,
+            # Cloud & DevOps
+            "aws": 0.10, "azure": 0.10, "docker": 0.08, "kubernetes": 0.08,
+            # Data Science
+            "machine learning": 0.15, "tensorflow": 0.12, "pandas": 0.10,
+            # Other important skills
+            "spring": 0.08, "django": 0.08, "flask": 0.08, "express": 0.08
+        }
+
+        boost = 0.0
+        matched_skills = 0
+
+        # Check for exact skill matches
+        for skill in candidate_skills:
+            skill_clean = skill.strip().lower()
+
+            # Check if skill appears in job title or description
+            if skill_clean in job_title or skill_clean in job_description:
+                weight = skill_weights.get(skill_clean, 0.05)  # Default weight for other skills
+                boost += weight
+                matched_skills += 1
+
+        # Additional boost for multiple skill matches
+        if matched_skills >= 3:
+            boost += 0.1  # Extra boost for multiple matches
+        elif matched_skills >= 2:
+            boost += 0.05
+
+        # Cap the boost to prevent over-inflation
+        return min(0.4, boost)
+
+    except Exception as e:
+        logger.error(f"Error calculating skill boost: {e}")
         return 0.0
 
 def generate_match_reasoning(job: Dict[str, Any], candidate: Dict[str, Any], score: float) -> List[str]:
@@ -104,40 +173,55 @@ def generate_match_reasoning(job: Dict[str, Any], candidate: Dict[str, Any], sco
 
     return reasons[:3]  # Limit to top 3 reasons
 
+async def generate_job_embeddings_batch(jobs: List[Dict[str, Any]]) -> List[List[float]]:
+    """Generate embeddings for multiple jobs in parallel"""
+    async def get_job_embedding(job: Dict[str, Any]) -> List[float]:
+        job_text = f"{job.get('title', '')} {job.get('description', '')} {' '.join(job.get('skills', []))}"
+        return await get_cached_embedding(job_text)
+
+    # Process jobs in parallel
+    embeddings = await asyncio.gather(*[get_job_embedding(job) for job in jobs])
+    return embeddings
+
+async def generate_candidate_embeddings_batch(candidates: List[Dict[str, Any]]) -> List[List[float]]:
+    """Generate embeddings for multiple candidates in parallel"""
+    async def get_candidate_embedding(candidate: Dict[str, Any]) -> List[float]:
+        candidate_text = f"{candidate.get('name', '')} {' '.join(candidate.get('skills', []))}"
+        return await get_cached_embedding(candidate_text)
+
+    # Process candidates in parallel
+    embeddings = await asyncio.gather(*[get_candidate_embedding(candidate) for candidate in candidates])
+    return embeddings
+
+@performance_monitor("Enhanced Matching (Parallel + Cached)")
 async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
-    """AI-powered candidate matching using Sentence Transformers (free alternative to OpenAI)"""
-    print("🚨 MATCHING NODE CALLED - DEBUG")
-    logger.info("🚨 MATCHING NODE CALLED - DEBUG")
+    """AI-powered candidate matching using Sentence Transformers with parallel processing and caching"""
     try:
-        print("🔄 Starting AI matching with Sentence Transformers")
-        logger.info("🔄 Starting AI matching with Sentence Transformers")
-        logger.info(f"🤖 Model: sentence-transformers/all-MiniLM-L6-v2 (FREE)")
-        print(f"🤖 Model: sentence-transformers/all-MiniLM-L6-v2 (FREE)")
-        logger.info(f"🎯 Using matching threshold: {MATCHING_THRESHOLD}")
-        logger.info(f"🔍 State keys available: {list(state.keys())}")
+        logger.info("Starting enhanced AI matching with parallel processing and caching")
+        logger.info(f"Using matching threshold: {MATCHING_THRESHOLD}")
 
         quality_checked_jobs = state.get("quality_checked_jobs", state.get("parsed_jobs", []))
-        print(f"📋 Jobs to match: {len(quality_checked_jobs)}")
-        logger.info(f"📋 Jobs to match: {len(quality_checked_jobs)}")
+        logger.info(f"Jobs to match: {len(quality_checked_jobs)}")
+
+        # DEBUG: Print state keys to see what's available
+        print(f"🔍 DEBUG MATCHING: Available state keys: {list(state.keys())}")
+        print(f"🔍 DEBUG MATCHING: Quality checked jobs: {len(quality_checked_jobs)}")
+        logger.info(f"🔍 DEBUG Available state keys: {list(state.keys())}")
+        if quality_checked_jobs:
+            print(f"🔍 DEBUG MATCHING: First job to match: {quality_checked_jobs[0].get('title')} at {quality_checked_jobs[0].get('company')}")
+            logger.info(f"🔍 DEBUG First job to match: {quality_checked_jobs[0].get('title')} at {quality_checked_jobs[0].get('company')}")
 
         if not quality_checked_jobs:
-            print("⚠️ No jobs to match - skipping matching")
-            logger.warning("⚠️ No jobs to match - skipping matching")
+            logger.warning("No jobs to match - skipping matching")
             state["matched_jobs"] = []
             return state
 
-        print("✅ Proceeding with matching - jobs found!")
-        logger.info("✅ Proceeding with matching - jobs found!")
-
     except Exception as e:
-        print(f"❌ Error in matching node initialization: {e}")
-        logger.error(f"❌ Error in matching node initialization: {e}", exc_info=True)
+        logger.error(f"Error in matching node initialization: {e}", exc_info=True)
         state["matched_jobs"] = []
         return state
 
     # Get real candidates from database
-    print("🔄 Starting database connection for candidates...")
-    logger.info("🔄 Starting database connection for candidates...")
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
         import os
@@ -145,20 +229,15 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
         load_dotenv()
         mongodb_uri = os.getenv("MONGODB_URI")
-        print(f"🔗 Connecting to MongoDB...")
-        logger.info(f"🔗 Connecting to MongoDB...")
         client = AsyncIOMotorClient(mongodb_uri)
         db = client.ai_recruitment
         candidates_collection = db.candidates
 
         # Fetch all candidates (removed availability filter - was blocking all matches)
-        print("🔍 Fetching candidates from database...")
-        logger.info("🔍 Fetching candidates from database...")
         candidates_cursor = candidates_collection.find({})
         db_candidates = await candidates_cursor.to_list(length=None)
 
-        print(f"📊 Found {len(db_candidates)} raw candidates in database")
-        logger.info(f"📊 Found {len(db_candidates)} raw candidates in database")
+        logger.info(f"Found {len(db_candidates)} candidates in database")
 
         # Convert to matching format
         candidates = []
@@ -181,105 +260,57 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 "summary": candidate.get("summary", "")
             })
 
-        print(f"📋 Loaded {len(candidates)} candidates from database")
-        logger.info(f"📋 Loaded {len(candidates)} candidates from database")
-
-        # Log candidate sample for debugging
-        if candidates:
-            sample_candidate = candidates[0]
-            logger.info(f"📝 Sample candidate: {sample_candidate['name']} - Skills: {sample_candidate['skills'][:3]} - Exp: {sample_candidate['experience']}y")
+        logger.info(f"Loaded {len(candidates)} candidates from database")
 
         if not candidates:
-            logger.warning("⚠️ No candidates found in database")
+            logger.warning("No candidates found in database")
             state["matched_jobs"] = []
             return state
 
     except Exception as e:
-        logger.error(f"❌ Failed to load candidates from database: {e}")
+        logger.error(f"Failed to load candidates from database: {e}")
+
+    # OPTIMIZATION: Generate all embeddings in parallel batches
+    logger.info("🚀 Generating job embeddings in parallel...")
+    job_embeddings = await generate_job_embeddings_batch(quality_checked_jobs)
+
+    logger.info("🚀 Generating candidate embeddings in parallel...")
+    candidate_embeddings = await generate_candidate_embeddings_batch(candidates)
 
     matched_jobs = []
-    total_api_calls = 0
+    total_comparisons = 0
 
-    print(f"🚨 DEBUG: Processing {len(quality_checked_jobs)} quality checked jobs")
-    logger.info(f"🚨 DEBUG: Processing {len(quality_checked_jobs)} quality checked jobs")
+    logger.info(f"Processing {len(quality_checked_jobs)} jobs against {len(candidates)} candidates")
 
-    for job_idx, job in enumerate(quality_checked_jobs):
+    # Process all job-candidate combinations with pre-computed embeddings
+    for job_idx, (job, job_embedding) in enumerate(zip(quality_checked_jobs, job_embeddings)):
         try:
             job_title = job.get('title', 'Unknown Job')
-            print(f"🔍 Processing job {job_idx+1}/{len(quality_checked_jobs)}: {job_title} at {job.get('company', 'Unknown Company')}")
-            logger.info(f"🔍 Processing job {job_idx+1}/{len(quality_checked_jobs)}: {job_title} at {job.get('company', 'Unknown Company')}")
-
-            # Create job description for embedding
-            job_text = f"""
-            Job Title: {job.get('title', '')}
-            Company: {job.get('company', '')}
-            Skills Required: {', '.join(job.get('skills_required', []))}
-            Experience: {job.get('experience_years_required', 0)} years
-            Description: {job.get('description', '')[:500]}
-            """
-
-            print(f"🔧 DEBUG: About to get job embedding for: {job_title}")
-            logger.info(f"🔧 DEBUG: About to get job embedding for: {job_title}")
-
-            # Get job embedding
-            job_embedding = get_embedding(job_text.strip())
-            print(f"🔧 DEBUG: Job embedding result: {len(job_embedding) if job_embedding else 'None'}")
-            logger.info(f"🔧 DEBUG: Job embedding result: {len(job_embedding) if job_embedding else 'None'}")
 
             if not job_embedding:
-                print(f"❌ Failed to get embedding for job: {job.get('title', 'Unknown')}")
-                logger.warning(f"❌ Failed to get embedding for job: {job.get('title', 'Unknown')}")
+                logger.warning(f"Failed to get embedding for job: {job_title}")
                 continue
 
-            total_api_calls += 1
             matches = []
 
-            # Match against each candidate
-            print(f"   🔍 Matching against {len(candidates)} candidates...")
-            logger.info(f"   🔍 Matching against {len(candidates)} candidates...")
-
-            for candidate_idx, candidate in enumerate(candidates):
+            # Match against each candidate using pre-computed embeddings
+            for candidate_idx, (candidate, candidate_embedding) in enumerate(zip(candidates, candidate_embeddings)):
                 try:
-                    print(f"   🔧 DEBUG: Processing candidate {candidate_idx+1}/{len(candidates)}: {candidate['name']}")
-                    logger.info(f"   🔧 DEBUG: Processing candidate {candidate_idx+1}/{len(candidates)}: {candidate['name']}")
-
-                    # Create candidate description for embedding
-                    candidate_text = f"""
-                    Name: {candidate['name']}
-                    Skills: {', '.join(candidate['skills'])}
-                    Experience: {candidate['experience']} years
-                    Location: {candidate['location']}
-                    Summary: {candidate['summary']}
-                    """
-
-                    print(f"   🔧 DEBUG: About to get candidate embedding for: {candidate['name']}")
-                    logger.info(f"   🔧 DEBUG: About to get candidate embedding for: {candidate['name']}")
-
-                    # Get candidate embedding
-                    candidate_embedding = get_embedding(candidate_text.strip())
-                    print(f"   🔧 DEBUG: Candidate embedding result: {len(candidate_embedding) if candidate_embedding else 'None'}")
-                    logger.info(f"   🔧 DEBUG: Candidate embedding result: {len(candidate_embedding) if candidate_embedding else 'None'}")
-
                     if not candidate_embedding:
-                        print(f"    Failed to get embedding for candidate: {candidate['name']}")
-                        logger.warning(f"    Failed to get embedding for candidate: {candidate['name']}")
                         continue
 
-                    total_api_calls += 1
+                    total_comparisons += 1
 
-                    # Calculate similarity score
-                    similarity_score = calculate_similarity_score(job_embedding, candidate_embedding)
+                    # Calculate similarity score using pre-computed embeddings
+                    base_similarity = calculate_similarity_score(job_embedding, candidate_embedding)
 
-                    # Log similarity score for debugging
-                    print(f"    {candidate['name']}: similarity = {similarity_score:.3f} (threshold: {MATCHING_THRESHOLD})")
-                    logger.info(f"    {candidate['name']}: similarity = {similarity_score:.3f} (threshold: {MATCHING_THRESHOLD})")
+                    # Boost score for exact skill matches
+                    skill_boost = calculate_skill_match_boost(job, candidate)
+                    similarity_score = min(1.0, base_similarity + skill_boost)
 
                     # Only include matches above threshold (configurable, default 0.5)
                     if similarity_score >= MATCHING_THRESHOLD:
                         reasons = generate_match_reasoning(job, candidate, similarity_score)
-
-                        print(f"   ✅ MATCH FOUND: {candidate['name']} with score {similarity_score:.3f}")
-                        logger.info(f"   ✅ MATCH FOUND: {candidate['name']} with score {similarity_score:.3f}")
 
                         matches.append({
                             "candidate_id": candidate["id"],
@@ -290,10 +321,6 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
                             "candidate_skills": candidate["skills"][:3],  # Top 3 skills
                             "candidate_experience": candidate["experience"]
                         })
-                    else:
-                        print(f"   ❌ Below threshold: {candidate['name']} ({similarity_score:.3f} < {MATCHING_THRESHOLD})")
-                        logger.debug(f"   ❌ Below threshold: {candidate['name']} ({similarity_score:.3f} < {MATCHING_THRESHOLD})")
-
                 except Exception as e:
                     logger.error(f"Error matching candidate {candidate['name']}: {e}")
                     continue
@@ -302,12 +329,13 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
             matches.sort(key=lambda x: x["score"], reverse=True)
             top_matches = matches[:3]  # Always take top 3 highest scoring candidates
 
-            # Log matching results
-            print(f"   ✅ Found {len(matches)} total matches, selected top {len(top_matches)}")
-            logger.info(f"   ✅ Found {len(matches)} total matches, selected top {len(top_matches)}")
-            for i, match in enumerate(top_matches, 1):
-                print(f"   {i}. {match['candidate_name']} (Score: {match['score']:.3f})")
-                logger.info(f"   {i}. {match['candidate_name']} (Score: {match['score']:.3f})")
+            # Log matching results for this job
+            if top_matches:
+                logger.info(f"Job '{job_title}': Found {len(top_matches)} matches")
+                print(f"🔍 DEBUG MATCHING OUTPUT: Job '{job_title}' has {len(top_matches)} matches")
+                print(f"🔍 DEBUG MATCHING OUTPUT: First match: {top_matches[0]}")
+            else:
+                print(f"🔍 DEBUG MATCHING OUTPUT: Job '{job_title}' has NO matches")
 
             # Add matched candidates to job for outreach
             job["matches"] = top_matches
@@ -341,31 +369,13 @@ async def matching_node(state: Dict[str, Any]) -> Dict[str, Any]:
     max_score = max(all_scores) if all_scores else 0
     min_score = min(all_scores) if all_scores else 0
 
-    print(f"✅ AI Matching completed:")
-    print(f"   📊 Jobs processed: {len(matched_jobs)}")
-    print(f"   🎯 Total matches found: {total_matches}")
-    print(f"   🤖 Sentence Transformer embeddings: {total_api_calls}")
-    print(f"   💰 Cost: $0.00 (FREE vs OpenAI ~$0.50-2.00)")
-    print(f"   🎚️ Threshold used: {MATCHING_THRESHOLD}")
-    if all_scores:
-        print(f"   📈 Score range: {min_score:.3f} - {max_score:.3f} (avg: {avg_score:.3f})")
-
-    logger.info(f"✅ AI Matching completed:")
+    logger.info(f"✅ Enhanced AI Matching completed:")
     logger.info(f"   📊 Jobs processed: {len(matched_jobs)}")
     logger.info(f"   🎯 Total matches found: {total_matches}")
-    logger.info(f"   🤖 Sentence Transformer embeddings: {total_api_calls}")
-    logger.info(f"   💰 Cost: $0.00 (FREE vs OpenAI ~$0.50-2.00)")
-    logger.info(f"   🎚️ Threshold used: {MATCHING_THRESHOLD}")
+    logger.info(f"   🔄 Total comparisons: {total_comparisons}")
+    logger.info(f"   🚀 Cached embeddings used: {len(job_embeddings) + len(candidate_embeddings)}")
+    logger.info(f"   📏 Threshold used: {MATCHING_THRESHOLD}")
     if all_scores:
         logger.info(f"   📈 Score range: {min_score:.3f} - {max_score:.3f} (avg: {avg_score:.3f})")
-
-    # DEBUG: Show detailed match information
-    for i, job in enumerate(matched_jobs):
-        job_matches = job.get("matches", [])
-        print(f"🔍 DEBUG Job {i+1}: '{job.get('title')}' has {len(job_matches)} matches")
-        logger.info(f"🔍 DEBUG Job {i+1}: '{job.get('title')}' has {len(job_matches)} matches")
-        for j, match in enumerate(job_matches):
-            print(f"   Match {j+1}: {match.get('candidate_name')} (ID: {match.get('candidate_id')}) - Score: {match.get('score', 0):.3f}")
-            logger.info(f"   Match {j+1}: {match.get('candidate_name')} (ID: {match.get('candidate_id')}) - Score: {match.get('score', 0):.3f}")
 
     return state
