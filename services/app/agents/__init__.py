@@ -10,5 +10,6 @@
 
 from .linkedin_agent import fetch_linkedin_jobs
 from .indeed_agent import fetch_indeed_jobs
+from .google_agent import fetch_google_jobs
 
-__all__ = ['fetch_linkedin_jobs', 'fetch_indeed_jobs']
+__all__ = ['fetch_linkedin_jobs', 'fetch_indeed_jobs', 'fetch_google_jobs']

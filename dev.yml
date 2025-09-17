@@ -1,20 +1,6 @@
 version: "3.8"
 
 services:
-    backend:
-        container_name: backend
-        build:
-            context: ./backend
-            dockerfile: Dockerfile
-        # internal only; exposed via nginx
-        volumes:
-            - ./backend:/usr/src/app
-            - /usr/src/app/node_modules
-        env_file:
-            - ./backend/.env
-        networks:
-            - network
-
     frontend:
         container_name: frontend
         build:
@@ -27,7 +13,7 @@ services:
         env_file:
             - ./frontend/.env
         depends_on:
-            - backend
+            - services
         networks:
             - network
 
@@ -42,7 +28,7 @@ services:
         env_file:
             - ./services/.env
         depends_on:
-            - backend
+            - frontend
         networks:
             - network
 

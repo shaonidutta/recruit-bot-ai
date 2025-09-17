@@ -1,150 +1,173 @@
-import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/Card';
-import { Badge } from '../../../components/ui/Badge';
-import { cn } from '../../../utils/cn';
-import { getMockData, simulateRealTimeUpdate } from '../../../data/mockData';
+import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import { AnimatedCounter, GrowthIndicator, LiveIndicator } from '../../../components/ui/AnimatedCounter';
+import { useJobs } from '../../../hooks/useJobs';
+import { useHealth } from '../../../hooks/useHealth';
+import { useRealTimeData } from '../../../hooks/useRealTimeData';
+import { jobsService } from '../../../api/services/jobsService';
+import { candidatesService } from '../../../api/services/candidatesService';
+import { useState, useEffect } from 'react';
 
-const MetricCard = ({ title, value, change, trend, percentage, icon, color, isAnimating }) => {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  // Animate counter on mount and value changes
-  useEffect(() => {
-    const duration = 1000; // 1 second
-    const steps = 30;
-    const increment = value / steps;
-    let current = 0;
-    
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= value) {
-        setDisplayValue(value);
-        clearInterval(timer);
-      } else {
-        setDisplayValue(Math.floor(current));
-      }
-    }, duration / steps);
-
-    return () => clearInterval(timer);
-  }, [value]);
-
-  const trendColor = trend === 'up' ? 'text-green-600' : 'text-red-600';
-  const trendIcon = trend === 'up' ? '↗️' : '↘️';
-  const bgGradient = color === 'blue' ? 'from-blue-500 to-blue-600' :
-                    color === 'green' ? 'from-green-500 to-green-600' :
-                    color === 'orange' ? 'from-orange-500 to-orange-600' :
-                    'from-purple-500 to-purple-600';
-
-  return (
-    <Card className={cn(
-      "relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-105",
-      isAnimating && "ring-2 ring-blue-500 ring-opacity-50"
-    )}>
-      {/* Background gradient */}
-      <div className={cn(
-        "absolute top-0 right-0 w-20 h-20 bg-gradient-to-br opacity-10 rounded-full -mr-10 -mt-10",
-        bgGradient
-      )} />
-      
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-slate-600">
-          {title}
-        </CardTitle>
-        <span className="text-2xl">{icon}</span>
-      </CardHeader>
-      
-      <CardContent>
-        <div className="flex items-baseline space-x-2">
-          <div className="text-3xl font-bold text-slate-900">
-            {displayValue.toLocaleString()}
+const MetricCard = ({
+  title,
+  value,
+  previousValue,
+  loading,
+  error,
+  icon,
+  color = 'blue',
+  subtitle,
+  isUpdating,
+  lastUpdated,
+  formatter
+}) => (
+  <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium text-gray-600">
+        {title}
+      </CardTitle>
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${
+        color === 'green' ? 'bg-green-100 text-green-600' :
+        color === 'red' ? 'bg-red-100 text-red-600' :
+        color === 'orange' ? 'bg-orange-100 text-orange-600' :
+        color === 'purple' ? 'bg-purple-100 text-purple-600' :
+        'bg-blue-100 text-blue-600'
+      }`}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {color === 'green' ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          ) : color === 'purple' ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+          ) : color === 'orange' ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m8 6V8a2 2 0 00-2-2H10a2 2 0 00-2 2v8a2 2 0 002 2h4a2 2 0 002-2z" />
+          )}
+        </svg>
+      </div>
+    </CardHeader>
+    <CardContent>
+      {loading ? (
+        <div className="flex items-center space-x-2">
+          <LoadingSpinner size="sm" />
+          <span className="text-sm text-slate-500">Loading...</span>
+        </div>
+      ) : error ? (
+        <div className="text-red-500 text-sm">Error loading data</div>
+      ) : (
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <div className="text-2xl font-bold text-gray-900">
+              {typeof value === 'string' ? value : (
+                <AnimatedCounter
+                  value={value || 0}
+                  formatter={formatter || ((val) => val.toLocaleString())}
+                />
+              )}
+            </div>
+            {previousValue !== undefined && (
+              <GrowthIndicator
+                current={value || 0}
+                previous={previousValue || 0}
+              />
+            )}
           </div>
-          {change !== 0 && (
-            <Badge 
-              variant={trend === 'up' ? 'success' : 'destructive'}
-              className="text-xs"
-            >
-              {trendIcon} {Math.abs(change)}
-            </Badge>
+
+          {subtitle && (
+            <p className="text-xs text-gray-500">{subtitle}</p>
           )}
         </div>
-        
-        <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-slate-500">
-            Today
-          </p>
-          {percentage && (
-            <p className={cn("text-xs font-medium", trendColor)}>
-              +{percentage}% from yesterday
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
+      )}
+    </CardContent>
+  </Card>
+);
 
 const MetricsCards = () => {
-  const [metrics, setMetrics] = useState(getMockData('metrics'));
-  const [animatingCard, setAnimatingCard] = useState(null);
+  const { stats, loading: jobsLoading, error: jobsError } = useJobs();
+  const { health, loading: healthLoading, error: healthError, isHealthy } = useHealth();
 
-  // Simulate real-time updates every 30 seconds
+  // Store previous values for growth calculation
+  const [previousStats, setPreviousStats] = useState(null);
+
+  // Real-time polling for enhanced metrics
+  const {
+    data: realtimeStats,
+    loading: realtimeLoading,
+    error: realtimeError,
+    lastUpdated
+  } = useRealTimeData(
+    async () => {
+      const response = await jobsService.getStats();
+      return response.success ? response.data.stats : null;
+    },
+    30000 // Poll every 30 seconds
+  );
+
+  // Update previous stats when new data arrives
   useEffect(() => {
-    const interval = setInterval(() => {
-      const updatedMetrics = simulateRealTimeUpdate('metrics');
-      if (updatedMetrics) {
-        setMetrics(updatedMetrics);
-        setAnimatingCard('jobs'); // Animate the jobs card
-        setTimeout(() => setAnimatingCard(null), 2000);
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const metricsConfig = [
-    {
-      key: 'jobsDiscovered',
-      title: 'Jobs Discovered',
-      icon: '📋',
-      color: 'blue'
-    },
-    {
-      key: 'outreachSent',
-      title: 'Outreach Sent',
-      icon: '📤',
-      color: 'green'
-    },
-    {
-      key: 'responsesReceived',
-      title: 'Responses Received',
-      icon: '📥',
-      color: 'orange'
-    },
-    {
-      key: 'matchesMade',
-      title: 'Matches Made',
-      icon: '🎯',
-      color: 'purple'
+    if (realtimeStats && stats) {
+      setPreviousStats(stats);
     }
-  ];
+  }, [realtimeStats, stats]);
+
+  // Use real-time data if available, fallback to regular stats
+  const currentStats = realtimeStats || stats;
+  const isLoading = (jobsLoading && !stats) || (realtimeLoading && !realtimeStats && !stats);
+  const hasError = jobsError || realtimeError;
+
+  // Only show updating indicator if we don't have any data yet, not during routine polling
+  const isUpdating = realtimeLoading && !currentStats;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {metricsConfig.map((config) => {
-        const metricData = metrics[config.key];
-        return (
-          <MetricCard
-            key={config.key}
-            title={config.title}
-            value={metricData.today}
-            change={metricData.change}
-            trend={metricData.trend}
-            percentage={metricData.percentage}
-            icon={config.icon}
-            color={config.color}
-            isAnimating={animatingCard === config.key}
-          />
-        );
-      })}
+      <MetricCard
+        title="Total Jobs"
+        value={currentStats?.total_jobs}
+        previousValue={previousStats?.total_jobs}
+        loading={isLoading}
+        error={hasError}
+        icon="💼"
+        color="blue"
+        subtitle="Jobs discovered"
+        isUpdating={isUpdating}
+        lastUpdated={lastUpdated}
+      />
+      <MetricCard
+        title="Active Jobs"
+        value={currentStats?.active_jobs}
+        previousValue={previousStats?.active_jobs}
+        loading={isLoading}
+        error={hasError}
+        icon="🎯"
+        color="green"
+        subtitle="Currently active"
+        isUpdating={isUpdating}
+        lastUpdated={lastUpdated}
+      />
+      <MetricCard
+        title="Total Candidates"
+        value={currentStats?.total_candidates}
+        previousValue={previousStats?.total_candidates}
+        loading={isLoading}
+        error={hasError}
+        icon="👥"
+        color="purple"
+        subtitle="Candidate profiles"
+        isUpdating={isUpdating}
+        lastUpdated={lastUpdated}
+      />
+      <MetricCard
+        title="Total Matches"
+        value={currentStats?.total_matches || 0}
+        previousValue={previousStats?.total_matches}
+        loading={isLoading}
+        error={hasError}
+        icon="⚡"
+        color="orange"
+        subtitle="Job-candidate matches"
+        isUpdating={isUpdating}
+        lastUpdated={lastUpdated}
+      />
     </div>
   );
 };

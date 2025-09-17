@@ -13,9 +13,10 @@ export const authService = {
 
       // Store tokens and user in localStorage
       if (response.data.success && response.data.data) {
-        localStorage.setItem('accessToken', response.data.data.accessToken);
-        localStorage.setItem('refreshToken', response.data.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+        const { user, tokens } = response.data.data;
+        localStorage.setItem('accessToken', tokens.accessToken);
+        localStorage.setItem('refreshToken', tokens.refreshToken);
+        localStorage.setItem('user', JSON.stringify(user));
       }
 
       return response.data;
@@ -31,9 +32,10 @@ export const authService = {
 
       // Store tokens and user in localStorage
       if (response.data.success && response.data.data) {
-        localStorage.setItem('accessToken', response.data.data.accessToken);
-        localStorage.setItem('refreshToken', response.data.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+        const { user, tokens } = response.data.data;
+        localStorage.setItem('accessToken', tokens.accessToken);
+        localStorage.setItem('refreshToken', tokens.refreshToken);
+        localStorage.setItem('user', JSON.stringify(user));
       }
 
       return response.data;
@@ -125,8 +127,9 @@ export const authService = {
       });
 
       if (response.data.success && response.data.data) {
-        localStorage.setItem('accessToken', response.data.data.accessToken);
-        localStorage.setItem('refreshToken', response.data.data.refreshToken);
+        const { tokens } = response.data.data;
+        localStorage.setItem('accessToken', tokens.accessToken);
+        localStorage.setItem('refreshToken', tokens.refreshToken);
         return response.data.data;
       }
 
