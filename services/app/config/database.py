@@ -36,8 +36,9 @@ async def connect_to_mongo():
         db.client = AsyncIOMotorClient(
             mongo_uri,
             maxPoolSize=10,
-            serverSelectionTimeoutMS=5000,
-            socketTimeoutMS=45000,
+            serverSelectionTimeoutMS=3000,  # Reduced timeout for faster startup
+            socketTimeoutMS=30000,
+            connectTimeoutMS=3000,  # Add connection timeout
         )
 
         # Test the connection with a simple ping

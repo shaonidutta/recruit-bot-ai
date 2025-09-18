@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
+import logging
 from dotenv import load_dotenv
 
 from .config.database import connect_to_mongo, close_mongo_connection
@@ -23,15 +24,28 @@ from .middleware.error_handler import add_exception_handlers
 # Load environment variables
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await connect_to_mongo()
+    try:
+        await connect_to_mongo()
+        logger.info("✅ Database connection established")
+    except Exception as e:
+        logger.warning(f"⚠️ Database connection failed: {e}")
+        logger.warning("⚠️ Continuing without database - some features may be limited")
+
     # start_scheduler()
     yield
     # Shutdown
     # stop_scheduler()
-    await close_mongo_connection()
+    try:
+        await close_mongo_connection()
+    except Exception as e:
+        logger.warning(f"⚠️ Error closing database connection: {e}")
 
 app = FastAPI(
     title="AI Recruitment Agent API",
@@ -70,4 +84,7 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Use PORT environment variable for deployment platforms like Render
+    port = int(os.getenv("PORT", 8000))
+    logger.info(f"🚀 Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
