@@ -1,6 +1,9 @@
 # FastAPI and server
 fastapi
 uvicorn[standard]
+email-validator
+google-search-results
+pydantic-core
 
 # Database
 motor
@@ -14,6 +17,8 @@ python-multipart
 # HTTP requests
 httpx
 requests
+aiohttp
+tenacity
 
 # Environment & Configuration
 python-dotenv
@@ -23,6 +28,7 @@ google-generativeai==0.8.3
 openai==1.54.3
 langsmith==0.1.129
 langchain-core==0.3.15
+langchain-openai
 
 # Workflow & Graph Processing
 langgraph==0.2.45
@@ -31,3 +37,4 @@ sentence-transformers==3.3.1
 # Data Processing & Analysis
 pandas==2.2.3
 numpy==2.1.3
+scikit-learn
