@@ -825,7 +825,8 @@ class UnifiedOrchestrator:
                 "jobs_discovered": stats.get('total_jobs_discovered', 0),
                 "jobs_stored": len(final_state.get('stored_jobs', [])),
                 "matches_found": len(final_state.get('matched_jobs', [])),
-                "outreach": outreach_summary,  # NEW FIELD
+                "emails_sent": outreach_summary.get('successful_emails', 0),  # Fixed: Map successful_emails to emails_sent for frontend
+                "outreach": outreach_summary,  # Detailed outreach info
                 "errors": final_state.get('errors', []),
                 "processing_time": stats.get('processing_time_seconds', 0)
             }

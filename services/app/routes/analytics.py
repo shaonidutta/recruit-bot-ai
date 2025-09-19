@@ -31,11 +31,46 @@ async def get_dashboard_analytics(
         # Calculate date range
         end_date = datetime.utcnow()
         start_date = end_date - timedelta(days=days)
-        
-        # Get collections
-        jobs_collection = JobService.get_collection()
-        matches_collection = MatchService.get_collection()
-        candidates_collection = CandidateService.get_collection()
+
+        # Check database connection first
+        try:
+            jobs_collection = JobService.get_collection()
+            matches_collection = MatchService.get_collection()
+            candidates_collection = CandidateService.get_collection()
+        except ConnectionError:
+            # Return mock data when database is not available
+            return send_success(
+                data={
+                    "job_trends": [],
+                    "source_breakdown": [
+                        {"name": "LinkedIn", "value": 40, "color": "#0077B5"},
+                        {"name": "Indeed", "value": 35, "color": "#2557A7"},
+                        {"name": "Google Jobs", "value": 25, "color": "#4285F4"}
+                    ],
+                    "workflow_performance": [
+                        {"stage": "Scraping", "success_rate": 95, "color": "#10B981"},
+                        {"stage": "Parsing", "success_rate": 88, "color": "#3B82F6"},
+                        {"stage": "Matching", "success_rate": 75, "color": "#8B5CF6"},
+                        {"stage": "Outreach", "success_rate": 60, "color": "#F59E0B"}
+                    ],
+                    "email_performance": [
+                        {"metric": "Sent", "value": 0, "color": "#3B82F6"},
+                        {"metric": "Delivered", "value": 0, "color": "#10B981"},
+                        {"metric": "Opened", "value": 0, "color": "#F59E0B"},
+                        {"metric": "Replied", "value": 0, "color": "#8B5CF6"}
+                    ],
+                    "summary_stats": {
+                        "total_jobs": 0,
+                        "total_matches": 0,
+                        "total_candidates": 0,
+                        "active_workflows": 0,
+                        "success_rate": 0,
+                        "period_days": days,
+                        "last_updated": datetime.utcnow().isoformat()
+                    }
+                },
+                message="Dashboard analytics (database offline - showing demo data)"
+            )
         
         # Job discovery trends (daily breakdown)
         job_trends = []
@@ -181,14 +216,26 @@ async def get_trend_analytics(
         start_date = end_date - timedelta(days=days)
         
         # Select collection based on metric
-        if metric == "jobs":
-            collection = JobService.get_collection()
-        elif metric == "matches":
-            collection = MatchService.get_collection()
-        elif metric == "candidates":
-            collection = CandidateService.get_collection()
-        else:
-            return send_error("Invalid metric. Use: jobs, matches, or candidates", 400)
+        try:
+            if metric == "jobs":
+                collection = JobService.get_collection()
+            elif metric == "matches":
+                collection = MatchService.get_collection()
+            elif metric == "candidates":
+                collection = CandidateService.get_collection()
+            else:
+                return send_error("Invalid metric. Use: jobs, matches, or candidates", 400)
+        except ConnectionError:
+            # Return empty trends when database is not available
+            return send_success(
+                data={
+                    "trends": [],
+                    "metric": metric,
+                    "period_days": days,
+                    "total_count": 0
+                },
+                message=f"Trend analytics for {metric} (database offline - no data available)"
+            )
         
         # Build aggregation pipeline for daily counts
         pipeline = [
@@ -255,9 +302,36 @@ async def get_performance_metrics(
     GET /api/v1/analytics/performance
     """
     try:
-        jobs_collection = JobService.get_collection()
-        matches_collection = MatchService.get_collection()
-        candidates_collection = CandidateService.get_collection()
+        # Check database connection first
+        try:
+            jobs_collection = JobService.get_collection()
+            matches_collection = MatchService.get_collection()
+            candidates_collection = CandidateService.get_collection()
+        except ConnectionError:
+            # Return mock data when database is not available
+            return send_success(
+                data={
+                    "kpis": {
+                        "total_jobs": 0,
+                        "total_matches": 0,
+                        "total_candidates": 0,
+                        "match_rate": 0,
+                        "candidate_utilization": 0
+                    },
+                    "match_quality": {
+                        "avg_score": 0,
+                        "max_score": 0,
+                        "min_score": 0,
+                        "total_matches": 0
+                    },
+                    "efficiency_metrics": {
+                        "jobs_per_hour": 0,
+                        "matches_per_job": 0,
+                        "processing_time": 0
+                    }
+                },
+                message="Performance metrics (database offline - showing demo data)"
+            )
         
         # Calculate key performance indicators
         total_jobs = await jobs_collection.count_documents({})

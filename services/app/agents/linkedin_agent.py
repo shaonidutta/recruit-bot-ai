@@ -20,7 +20,9 @@ async def fetch_linkedin_jobs(job_title: str) -> List[Dict]:
     params = {
         "engine": "google_jobs",
         "q": job_title,
+        "location": "United States",
         "hl": "en",
+        "gl": "us",
         "api_key": SERPAPI_KEY,
     }
 

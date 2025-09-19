@@ -29,18 +29,31 @@ async def get_matches(
     GET /api/v1/matches?limit=10&skip=0&job_id=xxx&min_score=0.5
     """
     try:
-        # Build filter query
-        filter_query = {"is_active": True}
-        if job_id:
-            filter_query["job_id"] = job_id
-        if candidate_id:
-            filter_query["candidate_id"] = candidate_id
-        if min_score is not None:
-            filter_query["match_score"] = {"$gte": min_score}
+        try:
+            # Build filter query
+            filter_query = {"is_active": True}
+            if job_id:
+                filter_query["job_id"] = job_id
+            if candidate_id:
+                filter_query["candidate_id"] = candidate_id
+            if min_score is not None:
+                filter_query["match_score"] = {"$gte": min_score}
 
-        # Get matches from database
-        collection = MatchService.get_collection()
-        cursor = collection.find(filter_query).sort("created_at", -1).skip(skip).limit(limit)
+            # Get matches from database
+            collection = MatchService.get_collection()
+            cursor = collection.find(filter_query).sort("created_at", -1).skip(skip).limit(limit)
+        except ConnectionError:
+            logger.warning("Database connection not available - returning empty matches")
+            return send_success(
+                data={
+                    "matches": [],
+                    "total": 0,
+                    "skip": skip,
+                    "limit": limit,
+                    "has_more": False
+                },
+                message="Matches retrieved (database offline - no data available)"
+            )
 
         matches = []
         async for match_doc in cursor:

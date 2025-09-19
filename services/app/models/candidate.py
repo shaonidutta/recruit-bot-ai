@@ -122,6 +122,8 @@ class CandidateService:
     def get_collection():
         """Get candidates collection"""
         db = get_database()
+        if db is None:
+            raise ConnectionError("Database connection is not available")
         return db[COLLECTIONS.get("candidates", "candidates")]
     
     @classmethod
@@ -246,12 +248,13 @@ class CandidateService:
         return None
     
     @classmethod
-    async def search_candidates(cls, query: str, skills: List[str] = None, skip: int = 0, limit: int = 100) -> List[CandidateInDB]:
+    async def search_candidates(cls, query: str, skills: Optional[List[str]] = None, skip: int = 0, limit: int = 100) -> List[CandidateInDB]:
         """Search candidates by name, skills, or role"""
         collection = cls.get_collection()
-        
-        search_conditions = [{"is_active": True}]
-        
+
+        # Type annotation for MongoDB query conditions
+        search_conditions: List[Dict[str, Any]] = [{"is_active": True}]
+
         if query:
             search_conditions.append({
                 "$or": [

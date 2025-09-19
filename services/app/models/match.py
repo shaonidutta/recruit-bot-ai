@@ -64,6 +64,8 @@ class MatchService:
     def get_collection():
         """Get matches collection"""
         db = get_database()
+        if db is None:
+            raise ConnectionError("Database connection is not available")
         return db[COLLECTIONS.get("matches", "matches")]
     
     @classmethod

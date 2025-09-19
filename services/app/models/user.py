@@ -80,6 +80,8 @@ class UserService:
     def get_collection():
         """Get users collection"""
         db = get_database()
+        if db is None:
+            raise Exception("Database not connected")
         return db[COLLECTIONS["users"]]
     
     @classmethod

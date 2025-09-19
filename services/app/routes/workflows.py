@@ -4,6 +4,7 @@ Simple Workflow Routes
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 from ..services.unified_orchestrator import run_unified_workflow
+from ..utils.caching import cache_manager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -45,4 +46,20 @@ async def run_workflow(request: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
+@router.post("/clear-cache")
+async def clear_cache():
+    """Clear all workflow caches"""
+    try:
+        await cache_manager.clear_all()
+        stats = await cache_manager.get_all_stats()
+        return {
+            "success": True,
+            "message": "All caches cleared successfully",
+            "data": {
+                "cache_stats": stats,
+                "cleared_at": "now"
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to clear cache: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

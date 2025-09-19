@@ -77,6 +77,8 @@ async def close_mongo_connection():
 
 def get_database():
     """Get database instance"""
+    if db.database is None:
+        logger.warning("⚠️ Database is not connected - returning None")
     return db.database
 
 def is_connected() -> bool:
@@ -93,3 +95,9 @@ async def get_connection_status() -> str:
         return "connected"
     except:
         return "disconnected"
+
+def ensure_database_connection():
+    """Ensure database connection is available, raise exception if not"""
+    if db.database is None:
+        raise ConnectionError("Database connection is not available. Please check your MongoDB connection.")
+    return db.database

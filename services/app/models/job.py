@@ -129,6 +129,8 @@ class JobService:
     def get_collection():
         """Get jobs collection"""
         db = get_database()
+        if db is None:
+            raise ConnectionError("Database connection is not available")
         return db[COLLECTIONS["jobs"]]
     
     @classmethod
@@ -358,7 +360,7 @@ class JobService:
         )
 
     @classmethod
-    async def find_duplicate_job(cls, title: str, company: str, url: str = None) -> Optional[JobInDB]:
+    async def find_duplicate_job(cls, title: str, company: str, url: Optional[str] = None) -> Optional[JobInDB]:
         """
         Check if a job already exists based on title, company, and optionally URL
         Returns the existing job if found, None otherwise

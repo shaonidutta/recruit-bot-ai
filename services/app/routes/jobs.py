@@ -29,10 +29,23 @@ async def get_jobs(
     try:
         logger.info(f"Getting jobs: skip={skip}, limit={limit}, active_only={active_only}, search={search}")
 
-        if search:
-            jobs = await JobService.search_jobs(search, skip, limit)
-        else:
-            jobs = await JobService.find_all(skip, limit, active_only)
+        try:
+            if search:
+                jobs = await JobService.search_jobs(search, skip, limit)
+            else:
+                jobs = await JobService.find_all(skip, limit, active_only)
+        except ConnectionError:
+            logger.warning("Database connection not available - returning empty job list")
+            return send_success(
+                data={
+                    "jobs": [],
+                    "total": 0,
+                    "skip": skip,
+                    "limit": limit,
+                    "has_more": False
+                },
+                message="Jobs retrieved (database offline - no data available)"
+            )
 
         logger.info(f"Retrieved {len(jobs)} jobs from database")
 
@@ -169,36 +182,48 @@ async def get_recent_jobs(
     GET /api/jobs/recent?limit=10&workflow_id=unified_20250821_103521
     """
     try:
-        # If no workflow_id provided, get the latest one
-        if not workflow_id:
-            workflow_id = await JobService.get_latest_workflow_id()
+        try:
+            # If no workflow_id provided, get the latest one
             if not workflow_id:
-                return send_success(
-                    data={
-                        "jobs": [],
-                        "workflow_id": None,
-                        "message": "No workflow runs found"
-                    },
-                    message="No recent jobs found"
-                )
+                workflow_id = await JobService.get_latest_workflow_id()
+                if not workflow_id:
+                    return send_success(
+                        data={
+                            "jobs": [],
+                            "workflow_id": None,
+                            "message": "No workflow runs found"
+                        },
+                        message="No recent jobs found"
+                    )
 
-        logger.info(f"Getting recent jobs for workflow_id: {workflow_id}")
+            logger.info(f"Getting recent jobs for workflow_id: {workflow_id}")
 
-        # Get jobs from the specified workflow
-        jobs = await JobService.find_by_workflow_id(workflow_id, 0, limit)
-        job_responses = [JobService.to_response(job).model_dump(mode='json') for job in jobs]
+            # Get jobs from the specified workflow
+            jobs = await JobService.find_by_workflow_id(workflow_id, 0, limit)
+            job_responses = [JobService.to_response(job).model_dump(mode='json') for job in jobs]
 
-        logger.info(f"Found {len(job_responses)} recent jobs from workflow {workflow_id}")
+            logger.info(f"Found {len(job_responses)} recent jobs from workflow {workflow_id}")
 
-        return send_success(
-            data={
-                "jobs": job_responses,
-                "workflow_id": workflow_id,
-                "count": len(job_responses),
-                "limit": limit
-            },
-            message=f"Recent jobs retrieved successfully from workflow {workflow_id}"
-        )
+            return send_success(
+                data={
+                    "jobs": job_responses,
+                    "workflow_id": workflow_id,
+                    "count": len(job_responses),
+                    "limit": limit
+                },
+                message=f"Recent jobs retrieved successfully from workflow {workflow_id}"
+            )
+        except ConnectionError:
+            logger.warning("Database connection not available - returning empty recent jobs")
+            return send_success(
+                data={
+                    "jobs": [],
+                    "workflow_id": None,
+                    "count": 0,
+                    "limit": limit
+                },
+                message="Recent jobs (database offline - no data available)"
+            )
     except Exception as e:
         logger.error(f"Error retrieving recent jobs: {str(e)}", exc_info=True)
         return send_error(f"Failed to retrieve recent jobs: {str(e)}", 500)
