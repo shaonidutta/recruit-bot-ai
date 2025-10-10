@@ -30,13 +30,22 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    try:
-        await connect_to_mongo()
-        logger.info("✅ Database connection established")
-    except Exception as e:
-        logger.warning(f"⚠️ Database connection failed: {e}")
-        logger.warning("⚠️ Continuing without database - some features may be limited")
+    # Startup - Make database connection non-blocking for faster startup
+    logger.info("🚀 Starting FastAPI application...")
+
+    # Start database connection in background (non-blocking)
+    import asyncio
+    async def connect_db():
+        try:
+            await connect_to_mongo()
+            logger.info("✅ Database connection established")
+        except Exception as e:
+            logger.warning(f"⚠️ Database connection failed: {e}")
+            logger.warning("⚠️ Continuing without database - some features may be limited")
+
+    # Don't wait for database connection - let it happen in background
+    asyncio.create_task(connect_db())
+    logger.info("🔄 Database connection started in background")
 
     # start_scheduler()
     yield
@@ -80,7 +89,18 @@ app.include_router(workflows_router, prefix="/api/v1/workflows", tags=["workflow
 
 @app.get("/")
 def read_root():
-    return {"message": "AI Services are running."}
+    """Root endpoint for quick health check"""
+    return {
+        "message": "AI Recruitment Services are running",
+        "status": "healthy",
+        "service": "AI Recruitment Agent API",
+        "version": "1.0.0"
+    }
+
+@app.get("/ping")
+def ping():
+    """Ultra-fast ping endpoint for Render health checks"""
+    return {"status": "ok", "timestamp": "2025-09-18"}
 
 if __name__ == "__main__":
     import uvicorn

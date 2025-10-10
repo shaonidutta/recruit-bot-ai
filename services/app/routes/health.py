@@ -13,21 +13,17 @@ router = APIRouter()
 @router.get("/")
 async def health_check():
     """
-    Basic health check endpoint
+    Basic health check endpoint - Fast response for Render deployment
     GET /health
     """
-    try:
-        return send_success(
-            data={
-                "status": "healthy",
-                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
-                "service": "AI Recruitment Agent API",
-                "version": "1.0.0"
-            },
-            message="Service is healthy"
-        )
-    except Exception as e:
-        return send_error("Health check failed", 500)
+    # Return simple JSON response without database dependency for faster startup
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+        "service": "AI Recruitment Agent API",
+        "version": "1.0.0",
+        "message": "Service is healthy"
+    }
 
 @router.get("/db")
 async def database_health():

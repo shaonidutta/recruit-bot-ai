@@ -32,13 +32,13 @@ async def connect_to_mongo():
         safe_uri = mongo_uri.replace(mongo_uri.split("@")[0].split("//")[1], "***:***") if "@" in mongo_uri else mongo_uri
         logger.info(f" Database URI: {safe_uri}")
 
-        # Connect to MongoDB with Motor AsyncIOMotorClient
+        # Connect to MongoDB with Motor AsyncIOMotorClient - Optimized for Render
         db.client = AsyncIOMotorClient(
             mongo_uri,
-            maxPoolSize=10,
-            serverSelectionTimeoutMS=3000,  # Reduced timeout for faster startup
-            socketTimeoutMS=30000,
-            connectTimeoutMS=3000,  # Add connection timeout
+            maxPoolSize=5,  # Reduced pool size for free tier
+            serverSelectionTimeoutMS=1000,  # Very fast timeout for Render
+            socketTimeoutMS=5000,  # Quick socket timeout
+            connectTimeoutMS=1000,  # Quick connection timeout
         )
 
         # Test the connection with a simple ping

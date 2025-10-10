@@ -5,8 +5,8 @@ services:
     region: oregon
     plan: free
     buildCommand: "cd services && pip install --upgrade pip && pip install -r requirements.txt"
-    startCommand: "cd services && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1"
-    healthCheckPath: "/health"
+    startCommand: "cd services && python start.py"
+    healthCheckPath: "/ping"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -16,3 +16,7 @@ services:
         value: false
       - key: PYTHONPATH
         value: /opt/render/project/src/services
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: HOST
+        value: "0.0.0.0"

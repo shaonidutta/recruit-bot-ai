@@ -29,14 +29,44 @@ class LLMEmailService:
     def __init__(self):
         # Gemini Configuration (Only LLM)
         self.gemini_api_key = os.getenv("GOOGLE_API_KEY")
-        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
         # Configure Gemini
         if self.gemini_api_key and GEMINI_AVAILABLE and genai:
-            genai.configure(api_key=self.gemini_api_key)
-            self.gemini_client = genai.GenerativeModel(self.gemini_model)
-            self.enabled = True
-            logger.info(f"✅ Gemini configured: {self.gemini_model} (Free)")
+            try:
+                genai.configure(api_key=self.gemini_api_key)
+
+                # Try different model names (updated for 2024/2025)
+                model_names_to_try = [
+                    "gemini-flash-latest",
+                    "gemini-2.5-flash",
+                    "gemini-pro-latest",
+                    "gemini-2.5-pro",
+                    "gemini-1.5-flash",  # fallback
+                    "gemini-pro"  # fallback
+                ]
+
+                self.gemini_client = None
+                for model_name in model_names_to_try:
+                    try:
+                        self.gemini_client = genai.GenerativeModel(model_name)
+                        self.gemini_model = model_name
+                        logger.info(f"✅ Gemini configured: {model_name} (Free)")
+                        break
+                    except Exception as model_error:
+                        logger.warning(f"⚠️ Failed to initialize {model_name}: {model_error}")
+                        continue
+
+                if self.gemini_client:
+                    self.enabled = True
+                else:
+                    logger.error("❌ No working Gemini model found")
+                    self.enabled = False
+
+            except Exception as e:
+                logger.error(f"❌ Gemini configuration failed: {e}")
+                self.enabled = False
+                self.gemini_client = None
         else:
             logger.error("❌ Gemini not configured - missing API key or installation")
             self.enabled = False
@@ -114,20 +144,27 @@ class LLMEmailService:
             if not self.gemini_client:
                 raise ValueError("Gemini client not initialized")
 
-            # Create generation config
-            generation_config = None
-            if genai and hasattr(genai, 'GenerationConfig'):
-                generation_config = genai.GenerationConfig(
-                    temperature=0.7,
-                    max_output_tokens=800,
-                    response_mime_type="application/json"
-                )
+            # Create generation config (simplified)
+            generation_config = {
+                'temperature': 0.7,
+                'max_output_tokens': 800,
+            }
 
-            response = await asyncio.to_thread(
-                self.gemini_client.generate_content,
-                full_prompt,
-                generation_config=generation_config
-            )
+            # Try to generate content with error handling
+            try:
+                response = await asyncio.to_thread(
+                    self.gemini_client.generate_content,
+                    full_prompt,
+                    generation_config=generation_config
+                )
+            except Exception as api_error:
+                logger.error(f"❌ Gemini API call failed: {api_error}")
+                # Try without generation config
+                logger.info("🔄 Retrying without generation config...")
+                response = await asyncio.to_thread(
+                    self.gemini_client.generate_content,
+                    full_prompt
+                )
 
             # Parse JSON response
             email_data = json.loads(response.text)
