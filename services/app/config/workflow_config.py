@@ -24,7 +24,7 @@ class WorkflowConfig:
     EMBEDDING_CACHE_TTL = int(os.getenv("EMBEDDING_CACHE_TTL", "604800"))  # 7 days
     
     # Performance Thresholds
-    MATCHING_THRESHOLD = float(os.getenv("MATCHING_THRESHOLD", "0.4"))
+    MATCHING_THRESHOLD = float(os.getenv("MATCHING_THRESHOLD", "0.7"))
     MAX_CANDIDATES_PER_JOB = int(os.getenv("MAX_CANDIDATES_PER_JOB", "3"))
     
     # Timeout Settings (Production: No timeouts for reliability)

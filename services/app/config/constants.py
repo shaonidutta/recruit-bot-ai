@@ -1,6 +1,8 @@
 """
 Application Constants
 Converted from backend/src/config/constants.js
+
+NOTE: For matching threshold, import from workflow_config.py (single source of truth)
 """
 
 # Job Sources Configuration
@@ -43,5 +45,6 @@ DEFAULT_KEYWORDS = "Software Engineer"
 DEFAULT_CRON_SCHEDULE = "0 2 * * *"  # 2:00 AM daily
 DEFAULT_TIMEZONE = "UTC"
 
-# Matching Configuration
-MATCHING_THRESHOLD = 0.4  # Minimum similarity score for candidate matches
+# NOTE: MATCHING_THRESHOLD moved to workflow_config.py (single source of truth)
+# Import from: from app.config.workflow_config import WorkflowConfig
+# Usage: WorkflowConfig.MATCHING_THRESHOLD

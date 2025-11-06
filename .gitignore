@@ -254,3 +254,9 @@ next-env.d.ts
 # Logs
 logs/
 *.log
+
+# Documentation (interview prep files)
+docs/
+
+# Test files
+tests/

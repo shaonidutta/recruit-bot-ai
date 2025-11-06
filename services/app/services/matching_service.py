@@ -8,6 +8,7 @@ from typing import Dict, List, Any, Optional
 import logging
 
 from ..config.llm_config import chat_completion, MODEL_CONFIGS
+from ..config.workflow_config import WorkflowConfig
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,8 @@ class MatchingEngine:
     """AI-powered matching with LLM-based semantic analysis"""
 
     def __init__(self):
-        self.min_match_score = 0.7
+        # Use centralized config (single source of truth)
+        self.min_match_score = WorkflowConfig.MATCHING_THRESHOLD
 
     async def match_candidates_to_job(self, job_data: Dict[str, Any], candidates: List[Dict[str, Any]], min_score: Optional[float] = None) -> Dict[str, Any]:
         """Score candidate matches for a job"""

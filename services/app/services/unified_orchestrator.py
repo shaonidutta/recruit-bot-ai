@@ -51,6 +51,7 @@ from .llm_email_service import llm_email_service  # LLM Email Generation
 from .langsmith_integration import langsmith_service  # LangSmith Evaluation
 
 from ..config.constants import DEFAULT_KEYWORDS
+from ..config.workflow_config import WorkflowConfig
 
 logger = logging.getLogger(__name__)
 
@@ -590,7 +591,7 @@ class UnifiedOrchestrator:
                     "max_concurrent_parsings": 5,
                     "max_concurrent_quality_checks": 5,
                     "min_description_length": 50,
-                    "min_match_score": 0.4
+                    "min_match_score": WorkflowConfig.MATCHING_THRESHOLD  # Single source of truth
                 }
             }
 
@@ -646,7 +647,7 @@ class UnifiedOrchestrator:
                         for match in job_matches:
                             match_score = match.get("score", 0)
 
-                            if match_score >= 0.4:  # Lowered threshold for realistic matches
+                            if match_score >= WorkflowConfig.MATCHING_THRESHOLD:  # Single source of truth
                                 if job_id not in jobs_with_candidates:
                                     jobs_with_candidates[job_id] = {
                                         "job": job,

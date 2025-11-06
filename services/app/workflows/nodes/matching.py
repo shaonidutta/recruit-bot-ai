@@ -14,6 +14,7 @@ from sentence_transformers import SentenceTransformer
 from ...utils.parallel_processing import parallel_processor, performance_monitor
 from ...utils.caching import cache_manager, cached_embedding
 from ...config.database import get_database
+from ...config.workflow_config import WorkflowConfig
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,8 @@ def get_embedding_model():
             embedding_model = None
     return embedding_model
 
-# Configurable matching threshold (set to 0.4 for production)
-MATCHING_THRESHOLD = float(os.getenv("MATCHING_THRESHOLD", "0.4"))
+# Get matching threshold from centralized config (single source of truth)
+MATCHING_THRESHOLD = WorkflowConfig.MATCHING_THRESHOLD
 
 @cached_embedding(model_name="all-MiniLM-L6-v2", ttl=604800)  # Cache for 7 days
 async def get_cached_embedding(text: str) -> List[float]:

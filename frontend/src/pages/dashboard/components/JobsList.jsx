@@ -1,21 +1,29 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/Card';
-import { Button } from '../../../components/ui/Button';
-import { Input } from '../../../components/ui/Input';
-import { Badge } from '../../../components/ui/Badge';
-import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import React, { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../../components/ui/Card";
+import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
+import { Badge } from "../../../components/ui/Badge";
+import { LoadingSpinner } from "../../../components/ui/LoadingSpinner";
+import { RefreshCw } from "lucide-react";
 
 const JobCard = ({ job, onViewDetails }) => (
   <div className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-all duration-200 hover:border-slate-300">
     <div className="flex justify-between items-start mb-3">
       <div className="flex-1">
         <h3 className="font-semibold text-slate-900 text-lg mb-1 line-clamp-2">
-          {job.title || 'Untitled Position'}
+          {job.title || "Untitled Position"}
         </h3>
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <span className="flex items-center gap-1">
             <span>🏢</span>
-            <span className="font-medium">{job.company || 'Unknown Company'}</span>
+            <span className="font-medium">
+              {job.company || "Unknown Company"}
+            </span>
           </span>
           {job.via && (
             <Badge variant="outline" className="text-xs">
@@ -25,7 +33,7 @@ const JobCard = ({ job, onViewDetails }) => (
         </div>
       </div>
     </div>
-    
+
     <div className="space-y-2 mb-4">
       {job.location && (
         <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -33,7 +41,7 @@ const JobCard = ({ job, onViewDetails }) => (
           <span>{job.location}</span>
         </div>
       )}
-      
+
       {job.salary && (
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <span>💰</span>
@@ -44,7 +52,7 @@ const JobCard = ({ job, onViewDetails }) => (
       {job.description && (
         <div className="text-sm text-slate-600 line-clamp-2">
           {job.description.substring(0, 150)}
-          {job.description.length > 150 && '...'}
+          {job.description.length > 150 && "..."}
         </div>
       )}
     </div>
@@ -54,11 +62,11 @@ const JobCard = ({ job, onViewDetails }) => (
         {job.created_at ? (
           <>Posted {new Date(job.created_at).toLocaleDateString()}</>
         ) : (
-          'Recently posted'
+          "Recently posted"
         )}
       </div>
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         size="sm"
         onClick={() => onViewDetails(job)}
         className="text-xs"
@@ -69,9 +77,17 @@ const JobCard = ({ job, onViewDetails }) => (
   </div>
 );
 
-const JobsList = ({ jobs, loading, error, searchJobs, fetchRecentJobs, pagination }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+const JobsList = ({
+  jobs,
+  loading,
+  error,
+  searchJobs,
+  fetchRecentJobs,
+  pagination,
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleSearch = async () => {
     if (searchTerm.trim()) {
@@ -82,8 +98,18 @@ const JobsList = ({ jobs, loading, error, searchJobs, fetchRecentJobs, paginatio
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSearch();
+    }
+  };
+
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchRecentJobs({ limit: 20 });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -91,10 +117,20 @@ const JobsList = ({ jobs, loading, error, searchJobs, fetchRecentJobs, paginatio
     setSelectedJob(job);
     // For now, just log the job details
     // In a full implementation, this would open a modal or navigate to a detail page
-    console.log('Job details:', job);
-    
+    console.log("Job details:", job);
+
     // You could also show an alert with job details for demo purposes
-    alert(`Job Details:\n\nTitle: ${job.title}\nCompany: ${job.company}\nLocation: ${job.location || 'Not specified'}\nSalary: ${job.salary || 'Not specified'}\n\nDescription: ${job.description ? job.description.substring(0, 200) + '...' : 'No description available'}`);
+    alert(
+      `Job Details:\n\nTitle: ${job.title}\nCompany: ${
+        job.company
+      }\nLocation: ${job.location || "Not specified"}\nSalary: ${
+        job.salary || "Not specified"
+      }\n\nDescription: ${
+        job.description
+          ? job.description.substring(0, 200) + "..."
+          : "No description available"
+      }`
+    );
   };
 
   const handleLoadMore = () => {
@@ -118,9 +154,23 @@ const JobsList = ({ jobs, loading, error, searchJobs, fetchRecentJobs, paginatio
               )}
             </div>
           </div>
-          <Badge variant="outline" className="text-sm">
-            {jobs.length} jobs
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={loading || isRefreshing}
+              className="flex items-center gap-1 hover:bg-slate-100 transition-colors"
+              title="Refresh jobs"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+              />
+            </Button>
+            <Badge variant="outline" className="text-sm">
+              {jobs.length} jobs
+            </Badge>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -133,12 +183,12 @@ const JobsList = ({ jobs, loading, error, searchJobs, fetchRecentJobs, paginatio
             onKeyPress={handleKeyPress}
             className="flex-1"
           />
-          <Button 
-            onClick={handleSearch} 
+          <Button
+            onClick={handleSearch}
             disabled={loading}
             className="min-w-[80px]"
           >
-            {loading ? <LoadingSpinner size="sm" /> : 'Search'}
+            {loading ? <LoadingSpinner size="sm" /> : "Search"}
           </Button>
         </div>
 
@@ -171,13 +221,14 @@ const JobsList = ({ jobs, loading, error, searchJobs, fetchRecentJobs, paginatio
               <p className="text-slate-500 text-sm mb-4">
                 {searchTerm
                   ? `No jobs match "${searchTerm}". Try different keywords.`
-                  : 'No recent jobs found. Try running the workflow to discover new jobs.'
-                }
+                  : "No recent jobs found. Try running the workflow to discover new jobs."}
               </p>
               {!searchTerm && (
-                <Button 
+                <Button
                   variant="outline"
-                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                  onClick={() =>
+                    window.scrollTo({ top: 0, behavior: "smooth" })
+                  }
                 >
                   Run Job Discovery
                 </Button>
@@ -187,19 +238,19 @@ const JobsList = ({ jobs, loading, error, searchJobs, fetchRecentJobs, paginatio
             <>
               <div className="grid gap-4">
                 {jobs.map((job, index) => (
-                  <JobCard 
-                    key={job.id || job._id || index} 
-                    job={job} 
+                  <JobCard
+                    key={job.id || job._id || index}
+                    job={job}
                     onViewDetails={handleViewDetails}
                   />
                 ))}
               </div>
-              
+
               {/* Load More Button */}
               {jobs.length >= 10 && (
                 <div className="text-center pt-4">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={handleLoadMore}
                     disabled={loading}
                   >
@@ -209,7 +260,7 @@ const JobsList = ({ jobs, loading, error, searchJobs, fetchRecentJobs, paginatio
                         <span>Loading more...</span>
                       </div>
                     ) : (
-                      'Load More Jobs'
+                      "Load More Jobs"
                     )}
                   </Button>
                 </div>

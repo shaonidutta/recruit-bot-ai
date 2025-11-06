@@ -18,7 +18,7 @@ router = APIRouter()
 
 @router.get("/matches")
 async def get_matches(
-    limit: int = Query(10, ge=1, le=100, description="Number of matches to return"),
+    limit: int = Query(10, ge=1, le=1000, description="Number of matches to return"),
     skip: int = Query(0, ge=0, description="Number of matches to skip"),
     job_id: Optional[str] = Query(None, description="Filter by job ID"),
     candidate_id: Optional[str] = Query(None, description="Filter by candidate ID"),

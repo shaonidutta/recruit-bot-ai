@@ -1,15 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './Card';
-import { Button } from './Button';
-import { LoadingSpinner } from './LoadingSpinner';
-import { MatchCard, CompactMatchCard } from './MatchCard';
-import { useMatches } from '../../hooks/useMatches';
+import React, {
+  useState,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "./Card";
+import { Button } from "./Button";
+import { LoadingSpinner } from "./LoadingSpinner";
+import { MatchCard, CompactMatchCard } from "./MatchCard";
+import { useMatches } from "../../hooks/useMatches";
 
 /**
  * MatchesList Component
  * Displays a list of job-candidate matches with filtering and pagination
  */
-export const MatchesList = ({ 
+export const MatchesList = ({
   title = "Recent Matches",
   jobId = null,
   candidateId = null,
@@ -20,11 +25,11 @@ export const MatchesList = ({
   onMatchSelect,
   onMatchContact,
   onMatchApprove,
-  onMatchReject
+  onMatchReject,
 }) => {
   const [filters, setFilters] = useState({
     min_score: null,
-    limit: limit
+    limit: limit,
   });
 
   // Determine which fetch method to use based on props
@@ -48,7 +53,7 @@ export const MatchesList = ({
     refresh,
     hasMatches,
     isEmpty,
-    canLoadMore
+    canLoadMore,
   } = useMatches(getInitialParams());
 
   // Initial data fetch
@@ -64,7 +69,7 @@ export const MatchesList = ({
 
   // Handle filter changes
   const handleFilterChange = (newFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
+    setFilters((prev) => ({ ...prev, ...newFilters }));
   };
 
   // Handle match actions
@@ -140,11 +145,15 @@ export const MatchesList = ({
         <CardContent>
           <div className="text-center py-8">
             <div className="text-gray-400 text-4xl mb-4">🔍</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No matches found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No matches found
+            </h3>
             <p className="text-gray-600 mb-4">
-              {jobId ? 'No candidates match this job yet.' : 
-               candidateId ? 'No jobs match this candidate yet.' :
-               'No recent matches available. Run a workflow to generate matches.'}
+              {jobId
+                ? "No candidates match this job yet."
+                : candidateId
+                ? "No jobs match this candidate yet."
+                : "No recent matches available. Run a workflow to generate matches."}
             </p>
             <Button onClick={refresh} variant="outline">
               Refresh
@@ -163,10 +172,10 @@ export const MatchesList = ({
             <span>🎯</span>
             <span>{title}</span>
             <span className="text-sm font-normal text-gray-500">
-              ({matches.length} {matches.length === 1 ? 'match' : 'matches'})
+              ({matches.length} {matches.length === 1 ? "match" : "matches"})
             </span>
           </CardTitle>
-          
+
           <div className="flex items-center space-x-2">
             {/* Refresh Button */}
             <Button
@@ -176,7 +185,7 @@ export const MatchesList = ({
               disabled={loading}
               className="text-xs"
             >
-              {loading ? <LoadingSpinner size="sm" /> : '🔄'}
+              {loading ? <LoadingSpinner size="sm" /> : "🔄"}
               Refresh
             </Button>
           </div>
@@ -188,10 +197,14 @@ export const MatchesList = ({
             <div className="flex items-center space-x-2">
               <label className="text-sm text-gray-600">Min Score:</label>
               <select
-                value={filters.min_score || ''}
-                onChange={(e) => handleFilterChange({ 
-                  min_score: e.target.value ? parseFloat(e.target.value) : null 
-                })}
+                value={filters.min_score || ""}
+                onChange={(e) =>
+                  handleFilterChange({
+                    min_score: e.target.value
+                      ? parseFloat(e.target.value)
+                      : null,
+                  })
+                }
                 className="text-sm border rounded px-2 py-1"
               >
                 <option value="">All</option>
@@ -208,7 +221,7 @@ export const MatchesList = ({
 
       <CardContent>
         {/* Matches List */}
-        <div className={`space-y-${compact ? '2' : '4'}`}>
+        <div className={`space-y-${compact ? "2" : "4"}`}>
           {matches.map((match) => {
             const MatchComponent = compact ? CompactMatchCard : MatchCard;
             return (
@@ -239,7 +252,9 @@ export const MatchesList = ({
                   <span className="ml-2">Loading more...</span>
                 </>
               ) : (
-                `Load More Matches (${pagination.total - matches.length} remaining)`
+                `Load More Matches (${
+                  pagination.total - matches.length
+                } remaining)`
               )}
             </Button>
           </div>
@@ -266,27 +281,129 @@ export const MatchesList = ({
 
 /**
  * Recent Matches Component - Specialized for dashboard
+ * Uses forwardRef to expose refresh method to parent components
  */
-export const RecentMatchesList = ({ limit = 5, onMatchSelect }) => {
-  return (
-    <MatchesList
-      title="Recent Matches"
-      limit={limit}
-      compact={true}
-      showFilters={false}
-      showLoadMore={false}
-      onMatchSelect={onMatchSelect}
-    />
-  );
-};
+export const RecentMatchesList = forwardRef(
+  ({ limit = 5, onMatchSelect }, ref) => {
+    const [filters, setFilters] = useState({
+      min_score: null,
+      limit: limit,
+    });
+
+    const {
+      matches,
+      loading,
+      error,
+      pagination,
+      fetchRecentMatches,
+      refresh,
+      hasMatches,
+      isEmpty,
+    } = useMatches({ limit });
+
+    // Initial data fetch
+    useEffect(() => {
+      fetchRecentMatches(filters.limit);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Expose refresh method to parent via ref
+    useImperativeHandle(ref, () => ({
+      refresh: () => {
+        fetchRecentMatches(filters.limit);
+      },
+    }));
+
+    // Handle match actions
+    const handleMatchSelect = (match) => {
+      onMatchSelect?.(match);
+    };
+
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🎯</span>
+              <span>Recent Matches</span>
+            </div>
+            {hasMatches && (
+              <span className="text-sm text-slate-500">
+                {matches.length} {matches.length === 1 ? "match" : "matches"}
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Loading State */}
+          {loading && !hasMatches && (
+            <div className="flex justify-center items-center py-12">
+              <div className="text-center">
+                <LoadingSpinner size="lg" />
+                <p className="text-slate-500 mt-2">Loading matches...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && !hasMatches && (
+            <div className="text-center py-12">
+              <div className="text-red-500 mb-2">❌</div>
+              <p className="text-red-600 font-medium">Error loading matches</p>
+              <p className="text-red-500 text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {isEmpty && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🔍</div>
+              <p className="text-slate-600 font-medium mb-2">
+                No matches found
+              </p>
+              <p className="text-slate-500 text-sm">
+                Run the workflow to discover new job-candidate matches
+              </p>
+            </div>
+          )}
+
+          {/* Matches List */}
+          {hasMatches && (
+            <div className="space-y-3">
+              {matches.map((match, index) => (
+                <CompactMatchCard
+                  key={match.id || index}
+                  match={match}
+                  onSelect={() => handleMatchSelect(match)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Loading indicator for refresh */}
+          {loading && hasMatches && (
+            <div className="mt-4 text-center">
+              <LoadingSpinner size="sm" />
+              <span className="ml-2 text-sm text-gray-600">Refreshing...</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+);
 
 /**
  * Job Matches Component - Shows matches for a specific job
  */
-export const JobMatchesList = ({ jobId, jobTitle, onMatchSelect, onMatchContact }) => {
+export const JobMatchesList = ({
+  jobId,
+  jobTitle,
+  onMatchSelect,
+  onMatchContact,
+}) => {
   return (
     <MatchesList
-      title={`Matches for ${jobTitle || 'Job'}`}
+      title={`Matches for ${jobTitle || "Job"}`}
       jobId={jobId}
       limit={20}
       compact={false}
@@ -301,10 +418,14 @@ export const JobMatchesList = ({ jobId, jobTitle, onMatchSelect, onMatchContact 
 /**
  * Candidate Matches Component - Shows matches for a specific candidate
  */
-export const CandidateMatchesList = ({ candidateId, candidateName, onMatchSelect }) => {
+export const CandidateMatchesList = ({
+  candidateId,
+  candidateName,
+  onMatchSelect,
+}) => {
   return (
     <MatchesList
-      title={`Matches for ${candidateName || 'Candidate'}`}
+      title={`Matches for ${candidateName || "Candidate"}`}
       candidateId={candidateId}
       limit={20}
       compact={false}
